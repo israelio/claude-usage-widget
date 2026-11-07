@@ -9,13 +9,16 @@ final class PanelController {
     private var panel: FloatingPanel?
     private var service: UsageService?
     private var settings: AppSettings?
+    /// A widget tap can arrive before the app's service is ready (cold launch); show as soon as it is.
+    private var pendingShow = false
 
     func configure(service: UsageService, settings: AppSettings) {
         self.service = service; self.settings = settings
+        if pendingShow { pendingShow = false; show(activate: true) }
     }
 
     func show(activate: Bool = false) {
-        guard let service, let settings else { return }
+        guard let service, let settings else { pendingShow = true; return }
         if panel == nil {
             panel = FloatingPanel(content: PopoverView(
                 service: service,

@@ -18,7 +18,6 @@ struct ClaudeUsageApp: App {
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
         Updater.shared.configure(settings: s)
-        PanelController.shared.configure(service: _service.wrappedValue, settings: s)
     }
 
     var body: some Scene {
@@ -26,7 +25,11 @@ struct ClaudeUsageApp: App {
             MenuBarPopover(service: service)
         } label: {
             LabelHost(service: service, settings: settings)
-                .onAppear { service.start(); Updater.shared.start(); syncPanel() }   // start() also performs the first refresh
+                .onAppear {
+                    // Hand the panel the app's real (installed) service; creating one in init() would be a separate copy.
+                    PanelController.shared.configure(service: service, settings: settings)
+                    service.start(); Updater.shared.start(); syncPanel()
+                }   // start() also performs the first refresh
         }
         .menuBarExtraStyle(.window)
         .onChange(of: settings.prefs.floatingPanel) { _, _ in syncPanel() }
