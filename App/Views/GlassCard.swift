@@ -5,6 +5,7 @@ struct GlassCard<Content: View>: View {
     var icon: String? = nil
     var trailing: AnyView? = nil
     @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -20,7 +21,12 @@ struct GlassCard<Content: View>: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.ultraThinMaterial)
+                if scheme == .dark { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.18)) }
+            }
+        }
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.12)))
     }
 }

@@ -11,6 +11,7 @@ struct PopoverView: View {
     var openHistory: () -> Void
     var openSettings: () -> Void
     @State private var showAbout = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         ScrollView {
@@ -53,7 +54,12 @@ struct PopoverView: View {
             .padding(10)
         }
         .frame(width: 360, height: PopoverView.preferredHeight)
-        .background(.regularMaterial)
+        .background(
+            ZStack {
+                Rectangle().fill(.regularMaterial)
+                if scheme == .dark { Color.black.opacity(0.42) }   // deepen the panel in dark mode
+            }
+        )
     }
 
     private var footer: some View {
