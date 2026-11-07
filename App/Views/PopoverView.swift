@@ -67,9 +67,12 @@ struct PopoverView: View {
     private var titleRow: some View {
         HStack(spacing: 6) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 18, height: 18)
-            Text("Claude Usage").font(.system(size: 12, weight: .semibold))
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("Claude Usage").font(.system(size: 12, weight: .semibold))
+                Text("v\(AppInfo.version)").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+            }
             Spacer()
-            Text("v\(AppInfo.version)").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+            StarPill()
         }
         .padding(.horizontal, 4)
     }
