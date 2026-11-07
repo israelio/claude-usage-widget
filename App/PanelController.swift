@@ -28,10 +28,13 @@ final class PanelController {
                 openSettings: {
                     NSApp.activate(ignoringOtherApps: true)
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                }),
+                },
+                panelHeight: nil),
                 onClose: { Task { @MainActor in settings.prefs.floatingPanel = false } })
         }
-        if centered, let panel, !panel.isVisible { center(panel) }
+        if let panel {
+            if centered, !panel.isVisible { center(panel) } else { fit(panel) }
+        }
         panel?.orderFrontRegardless()
         if activate { NSApp.activate(ignoringOtherApps: true) }
     }
@@ -46,5 +49,17 @@ final class PanelController {
         frame.size.height = min(frame.size.height, area.height - 40)
         frame.origin = NSPoint(x: area.midX - frame.width / 2, y: area.midY - frame.height / 2)
         panel.setFrame(frame, display: true)
+    }
+
+    /// Keep the panel fully on a screen it overlaps (screen size or arrangement may have changed since it was saved).
+    private func fit(_ panel: NSPanel) {
+        let screen = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let area = screen.visibleFrame
+        var f = panel.frame
+        f.size.height = min(f.height, area.height - 20)
+        f.size.width = min(f.width, area.width - 20)
+        f.origin.x = min(max(f.origin.x, area.minX), area.maxX - f.width)
+        f.origin.y = min(max(f.origin.y, area.minY), area.maxY - f.height)
+        if f != panel.frame { panel.setFrame(f, display: true) }
     }
 }

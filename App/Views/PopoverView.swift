@@ -3,13 +3,16 @@ import UsageCore
 
 struct PopoverView: View {
     /// Tall enough to show every card without scrolling; capped to the screen so it never overflows.
-    static var preferredHeight: CGFloat {
-        min(1040, (NSScreen.main?.visibleFrame.height ?? 900) - 40)
+    static var preferredHeight: CGFloat { preferredHeight(for: NSScreen.main) }
+    static func preferredHeight(for screen: NSScreen?) -> CGFloat {
+        min(1040, (screen?.visibleFrame.height ?? 900) - 40)
     }
 
     @ObservedObject var service: UsageService
     var openHistory: () -> Void
     var openSettings: () -> Void
+    /// Fixed height for the menu bar popover; nil lets the content fill its container (the resizable floating panel).
+    var panelHeight: CGFloat? = PopoverView.preferredHeight
     @State private var showAbout = false
     @Environment(\.colorScheme) private var scheme
 
@@ -55,7 +58,7 @@ struct PopoverView: View {
             }
             .padding(10)
         }
-        .frame(width: 360, height: PopoverView.preferredHeight)
+        .frame(width: 360, height: panelHeight)
         .background(
             ZStack {
                 Rectangle().fill(.regularMaterial)

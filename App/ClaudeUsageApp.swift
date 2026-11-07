@@ -10,6 +10,8 @@ struct ClaudeUsageApp: App {
     init() {
         // Show native tooltips quickly (default is ~1.5s).
         UserDefaults.standard.set(100, forKey: "NSInitialToolTipDelay")
+        // Older versions used a SwiftUI "history" window scene; its saved-window entry makes that window reappear.
+        UserDefaults.standard.removeObject(forKey: "NSWindow Frame history")
         let s = AppSettings()
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
