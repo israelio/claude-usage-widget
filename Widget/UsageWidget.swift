@@ -24,6 +24,17 @@ struct Provider: TimelineProvider {
     }
 }
 
+private struct FreshnessCaption: View {
+    let snapshot: SharedSnapshot
+    var body: some View {
+        if snapshot.limits?.isEstimated == true {
+            Text("estimated").font(.system(size: 10)).foregroundStyle(.orange)
+        } else {
+            Text("updated \(Text(snapshot.updatedAt, style: .relative)) ago").font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+    }
+}
+
 private func color(_ u: Double) -> Color { u >= 85 ? .red : u >= 60 ? .orange : .green }
 
 struct Ring: View {
@@ -66,6 +77,7 @@ struct UsageWidgetView: View {
                         Text("5h session").font(.caption2).foregroundStyle(.secondary)
                         Ring(value: l.fiveHour?.utilization ?? 0).frame(width: 78, height: 78)
                         Text("Week \(Int((l.sevenDay?.utilization ?? 0).rounded()))%").font(.caption2.bold())
+                        FreshnessCaption(snapshot: s)
                     }
                 case .systemMedium:
                     VStack(alignment: .leading, spacing: 10) {
@@ -73,6 +85,7 @@ struct UsageWidgetView: View {
                         Bar(title: "Weekly Limit", window: l.sevenDay)
                         Text("Today \(Format.cost(s.today.cost)) · \(Format.tokens(s.today.tokens.total)) tokens")
                             .font(.caption2).foregroundStyle(.secondary)
+                        FreshnessCaption(snapshot: s)
                     }
                 default:
                     VStack(alignment: .leading, spacing: 10) {
@@ -85,6 +98,7 @@ struct UsageWidgetView: View {
                         HStack {
                             Text("Today \(Format.cost(s.today.cost))"); Spacer(); Text("7d \(Format.cost(s.last7.cost))")
                         }.font(.caption.bold())
+                        FreshnessCaption(snapshot: s)
                     }
                 }
             } else {

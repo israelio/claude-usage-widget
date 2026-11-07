@@ -3,13 +3,14 @@ import UsageCore
 
 struct PopoverView: View {
     @ObservedObject var service: UsageService
-    @Environment(\.openWindow) private var openWindow
+    var openHistory: () -> Void
+    var openSettings: () -> Void
 
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
                 if let e = service.error {
-                    Label(e + " — showing local estimate", systemImage: "exclamationmark.triangle.fill")
+                    Label(e + (service.limits?.isEstimated == false ? " — showing last known values" : " — showing local estimate"), systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if let l = service.limits {
@@ -29,8 +30,17 @@ struct PopoverView: View {
                         Text("Next refresh in ").foregroundStyle(.secondary)
                         Text(service.nextRefresh, style: .timer).monospacedDigit()
                         Spacer()
-                        if let l = service.limits, l.isEstimated { Text("estimated").font(.caption).foregroundStyle(.orange) }
+                        if let l = service.limits {
+                            if l.isEstimated { Text("estimated").font(.caption).foregroundStyle(.orange) }
+                            else if service.error != nil {
+                                Text("updated \(Text(l.fetchedAt, style: .relative)) ago").font(.caption).foregroundStyle(.orange)
+                            }
+                        }
                     }.font(.system(size: 11))
+                }
+                if !service.groupAvailable {
+                    Text("Widgets need signing + app group").font(.caption2).foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 footer
             }
@@ -46,8 +56,8 @@ struct PopoverView: View {
                 Button { NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!) } label: { Label("Claude", systemImage: "arrow.up.right.square") }
                 Spacer()
                 Button { service.refreshNow() } label: { Image(systemName: "arrow.clockwise") }
-                Button { openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true) } label: { Image(systemName: "chart.bar.doc.horizontal") }
-                SettingsLink { Image(systemName: "gearshape") }
+                Button { openHistory() } label: { Image(systemName: "chart.bar.doc.horizontal") }
+                Button { openSettings() } label: { Image(systemName: "gearshape") }
                 Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
             }.buttonStyle(.plain).font(.system(size: 13))
         }

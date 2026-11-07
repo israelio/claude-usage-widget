@@ -3,6 +3,8 @@ import UsageCore
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
+    @State private var thresholdText = ""
+    @FocusState private var thresholdFocused: Bool
 
     var body: some View {
         Form {
@@ -22,9 +24,10 @@ struct SettingsView: View {
                 Toggle("Quiet hours (22:00–08:00)", isOn: Binding(
                     get: { settings.prefs.alerts.quietStartHour != nil },
                     set: { settings.prefs.alerts.quietStartHour = $0 ? 22 : nil; settings.prefs.alerts.quietEndHour = $0 ? 8 : nil }))
-                TextField("Thresholds %", text: Binding(
-                    get: { settings.prefs.alerts.thresholds.map(String.init).joined(separator: ", ") },
-                    set: { settings.prefs.alerts.thresholds = $0.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) } }))
+                TextField("Thresholds %", text: $thresholdText)
+                    .focused($thresholdFocused)
+                    .onSubmit(commitThresholds)
+                    .onChange(of: thresholdFocused) { _, f in if !f { commitThresholds() } }
             }
             Section("Fallback estimate (used only when the usage API is unavailable)") {
                 Stepper("5h budget: \(Format.tokens(settings.prefs.planLimits.fiveHourTokens))",
@@ -44,6 +47,17 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped).frame(width: 560, height: 620)
+        .onAppear { thresholdText = Self.format(settings.prefs.alerts.thresholds) }
+        .onDisappear(perform: commitThresholds)
+    }
+
+    private static func format(_ t: [Int]) -> String { t.map(String.init).joined(separator: ", ") }
+
+    private func commitThresholds() {
+        let parsed = thresholdText.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { (1...100).contains($0) }
+        settings.prefs.alerts.thresholds = parsed
+        thresholdText = Self.format(parsed)
     }
 
     private func priceField(_ label: String, _ fam: String, _ kp: WritableKeyPath<ModelPrice, Double>) -> some View {

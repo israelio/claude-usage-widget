@@ -1,4 +1,8 @@
 // Defaults. Override in Local.xcconfig (gitignored).
+// APP_GROUP_ID must be provisioned for your signing team. On macOS the group id should be prefixed with your
+// Team ID (e.g. ABCDE12345.com.you.claudeusagewidget) or use the iOS-style "group." form registered in your
+// developer account. Unsigned builds can't access the group, so widgets show no data; set DEVELOPMENT_TEAM and
+// a matching APP_GROUP_ID in Local.xcconfig.
 APP_GROUP_ID = group.com.ohad.claudeusagewidget
 DEVELOPMENT_TEAM =
 #include? "Local.xcconfig"
