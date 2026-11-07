@@ -13,6 +13,8 @@ struct ClaudeUsageApp: App {
     @State private var panel: FloatingPanel?
 
     init() {
+        // Show native tooltips quickly (default is ~1.5s).
+        UserDefaults.standard.set(100, forKey: "NSInitialToolTipDelay")
         let s = AppSettings()
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
