@@ -9,7 +9,7 @@ enum MenuBarMode: String, Codable, CaseIterable, Identifiable {
 struct Prefs: Codable, Equatable {
     var menuBarMode: MenuBarMode = .sessionWeekly
     var floatingPanel = false
-    var pollSeconds = 60
+    var pollSeconds = 300
     var alerts = AlertSettings()
     var planLimits = PlanLimits()
     var prices = PriceTable.defaults
@@ -20,7 +20,7 @@ struct Prefs: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         menuBarMode = try c.decodeIfPresent(MenuBarMode.self, forKey: .menuBarMode) ?? .sessionWeekly
         floatingPanel = try c.decodeIfPresent(Bool.self, forKey: .floatingPanel) ?? false
-        pollSeconds = try c.decodeIfPresent(Int.self, forKey: .pollSeconds) ?? 60
+        pollSeconds = try c.decodeIfPresent(Int.self, forKey: .pollSeconds) ?? 300
         alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? AlertSettings()
         planLimits = try c.decodeIfPresent(PlanLimits.self, forKey: .planLimits) ?? PlanLimits()
         prices = try c.decodeIfPresent(PriceTable.self, forKey: .prices) ?? .defaults
