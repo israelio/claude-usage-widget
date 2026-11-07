@@ -19,12 +19,22 @@ final class UsageService: ObservableObject {
     private var previous: LimitsSnapshot?
     private var fired: FiredState
     private var loop: Task<Void, Never>?
+    private var isRefreshing = false
+    private var lastFetchSuccess: Date?
+    private var failures = 0
+    private var lastWritten: SharedSnapshot?
+    /// False when the App Group container isn't provisioned (unsigned build): widgets can't see our data.
+    let groupAvailable: Bool
+    private static let minPoll = 30
+    private static let maxBackoff = 600
+    private static let fetchCooldown: TimeInterval = 10
     private static let firedKey = "fired.v1"
 
     init(settings: AppSettings, client: LimitsProviding = OAuthLimitsClient()) {
         self.settings = settings
         self.client = client
         self.groupID = Bundle.main.object(forInfoDictionaryKey: "AppGroupID") as? String ?? ""
+        self.groupAvailable = SharedSnapshot.groupURL(groupID: groupID) != nil
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ClaudeUsageWidget")
         let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
@@ -40,53 +50,78 @@ final class UsageService: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh()
-                let secs = max(15, self.settings.prefs.pollSeconds)
+                let secs = self.currentInterval()
                 self.nextRefresh = Date().addingTimeInterval(Double(secs))
                 try? await Task.sleep(for: .seconds(secs))
             }
         }
     }
 
-    func refreshNow() { Task { await refresh() } }
+    /// Poll interval, doubled per consecutive failure up to 10 minutes; resets on success.
+    private func currentInterval() -> Int {
+        let base = max(Self.minPoll, settings.prefs.pollSeconds)
+        guard failures > 0 else { return base }
+        return min(max(base, Self.maxBackoff), base << min(failures, 10))
+    }
+
+    func refreshNow() {
+        guard !isRefreshing else { return }
+        Task { await refresh() }
+    }
 
     func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         let now = Date()
         let prefs = settings.prefs
         let hist = await ingestor.refreshLogs(now: now)
 
         // Publish local data immediately so the UI/widget don't wait on Keychain or network.
         let estimate = LocalEstimator.estimate(records: hist.recent, limits: prefs.planLimits, now: now)
-        let early = Aggregator.summarize(await ingestor.current(), prices: prefs.prices, now: now)
-        let earlyHist = await ingestor.current()
-        history = earlyHist; summary = early
+        let early = Aggregator.summarize(hist, prices: prefs.prices, now: now)
+        history = hist; summary = early
         if limits == nil {
             limits = estimate
-            writeSnapshot(estimate, early, earlyHist, now)
+            writeSnapshot(estimate, early, hist, now)
         }
 
         var snap: LimitsSnapshot
-        do {
-            snap = try await client.fetch()
-            error = nil
-            await ingestor.record(snap)
-        } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            snap = estimate
+        var fetched = false
+        if let t = lastFetchSuccess, now.timeIntervalSince(t) < Self.fetchCooldown, let l = limits, !l.isEstimated {
+            snap = l   // fetched very recently; just rescan logs
+        } else {
+            do {
+                snap = try await client.fetch()
+                error = nil
+                failures = 0
+                fetched = true
+                lastFetchSuccess = Date()
+                await ingestor.record(snap)
+            } catch {
+                self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                failures += 1
+                // Keep the last real snapshot (now stale); only fall back to the estimate if there is none.
+                if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
+            }
         }
+        let now2 = Date()   // the fetch may have blocked on a Keychain prompt for a long time
         let hist2 = await ingestor.current()
-        let sum = Aggregator.summarize(hist2, prices: prefs.prices, now: now)
+        let sum = Aggregator.summarize(hist2, prices: prefs.prices, now: now2)
 
         var msgs: [AlertMessage] = []
-        if !snap.isEstimated {
-            msgs += AlertEngine.evaluate(current: snap, previous: previous, settings: prefs.alerts, fired: &fired, now: now)
+        if fetched, !snap.isEstimated, !AlertEngine.isQuiet(prefs.alerts, now: now2, calendar: .current) {
+            msgs += AlertEngine.evaluate(current: snap, previous: previous, settings: prefs.alerts, fired: &fired, now: now2)
+            // Only advance `previous` when alerts actually ran, so a reset during quiet hours isn't lost.
+            previous = snap
         }
-        msgs += AlertEngine.digests(summary: sum, settings: prefs.alerts, fired: &fired, now: now)
+        msgs += AlertEngine.digests(summary: sum, settings: prefs.alerts, fired: &fired, now: now2)
         msgs.forEach(Notifier.post)
         if let d = try? JSONEncoder().encode(fired) { UserDefaults.standard.set(d, forKey: Self.firedKey) }
 
-        if !snap.isEstimated { previous = snap }
         limits = snap; summary = sum; history = hist2
-        writeSnapshot(snap, sum, hist2, now)
+        writeSnapshot(snap, sum, hist2, now2)
     }
 
     func daily(days: Int) -> [DailyPoint] {
@@ -100,6 +135,10 @@ final class UsageService: ObservableObject {
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("ClaudeUsageWidget/snapshot.json")
         try? snap.save(to: url)
-        WidgetCenter.shared.reloadAllTimelines()
+        // Reload timelines only when the content (ignoring the timestamp) actually changed.
+        var cmp = snap; cmp.updatedAt = .distantPast
+        var last = lastWritten; last?.updatedAt = .distantPast
+        lastWritten = snap
+        if cmp != last { WidgetCenter.shared.reloadAllTimelines() }
     }
 }
