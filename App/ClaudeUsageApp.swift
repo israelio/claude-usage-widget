@@ -82,6 +82,10 @@ private struct LabelHost: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
             }
             .task {
+                // Developer convenience (used for README screenshots): `open Claude\ Usage.app --args --show-history`.
+                if CommandLine.arguments.contains("--show-history") {
+                    openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true)
+                }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode))
             }

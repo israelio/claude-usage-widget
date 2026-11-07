@@ -8,11 +8,20 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
 
 > ⭐ **Staraware.** Instead of paying, pay with a star. If you like it, [star the repo](https://github.com/israelio/claude-usage-widget). Made by Ohad Israeli.
 
-## Screenshot
+## Screenshots
 
-<p align="center">
-  <img src="docs/images/popover.png" alt="Claude Usage popover showing session, weekly and Fable limits, pace chart, daily usage and token costs" width="360">
-</p>
+<table>
+  <tr>
+    <td valign="top" align="center">
+      <img src="docs/images/popover.png" alt="Claude Usage panel: session, weekly and Fable limits with pace markers, pace chart, daily usage, token costs and plan" width="300"><br>
+      <sub>The panel: limits, pace, daily usage, tokens and plan</sub>
+    </td>
+    <td valign="top" align="center">
+      <img src="docs/images/history.png" alt="90-day usage history window with cost chart, model breakdown and totals" width="560"><br>
+      <sub>90-day usage history: cost or tokens, model breakdown, CSV export</sub>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
