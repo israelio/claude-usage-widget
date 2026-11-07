@@ -16,6 +16,7 @@ struct PopoverView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
+                titleRow
                 if let e = service.error {
                     Label(e + (service.limits?.isEstimated == false ? " — showing last known values" : " — showing local estimate"), systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange).frame(maxWidth: .infinity, alignment: .leading)
@@ -61,6 +62,16 @@ struct PopoverView: View {
                 if scheme == .dark { Color.black.opacity(0.42) }   // deepen the panel in dark mode
             }
         )
+    }
+
+    private var titleRow: some View {
+        HStack(spacing: 6) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 18, height: 18)
+            Text("Claude Usage").font(.system(size: 12, weight: .semibold))
+            Spacer()
+            Text("v\(AppInfo.version)").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 4)
     }
 
     private var footer: some View {

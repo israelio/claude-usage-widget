@@ -4,16 +4,12 @@ import AppKit
 struct AboutView: View {
     static let repoURL = URL(string: "https://github.com/israelio/claude-usage-widget")!
 
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable().frame(width: 72, height: 72)
             Text("Claude Usage").font(.title3.bold())
-            Text("Version \(version)").font(.caption).foregroundStyle(.secondary)
+            Text("Version \(AppInfo.version)").font(.caption).foregroundStyle(.secondary)
 
             Divider().padding(.vertical, 2)
 
