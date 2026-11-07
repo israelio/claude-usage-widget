@@ -4,12 +4,15 @@ import AppKit
 struct AboutView: View {
     static let repoURL = URL(string: "https://github.com/israelio/claude-usage-widget")!
 
+    @ObservedObject private var updater = Updater.shared
+
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable().frame(width: 72, height: 72)
             Text("Claude Usage").font(.title3.bold())
             Text("Version \(AppInfo.version)").font(.caption).foregroundStyle(.secondary)
+            updateRow
 
             Divider().padding(.vertical, 2)
 
@@ -32,5 +35,28 @@ struct AboutView: View {
         }
         .padding(18)
         .frame(width: 280)
+    }
+
+    @ViewBuilder private var updateRow: some View {
+        HStack(spacing: 6) {
+            Button("Check for updates") { updater.checkNow(userInitiated: true) }
+                .controlSize(.small).disabled(updater.busy)
+            if updater.busy { ProgressView().controlSize(.small) }
+        }
+        switch updater.state {
+        case .upToDate:
+            Text("You're up to date").font(.caption).foregroundStyle(.secondary)
+        case .available(let info):
+            Text("Version \(info.version) available").font(.caption).foregroundStyle(.secondary)
+            if updater.canSelfInstall {
+                Button("Install & restart") { updater.install(info) }.controlSize(.small)
+            } else {
+                Button("Download") { NSWorkspace.shared.open(info.pageURL) }.controlSize(.small)
+            }
+        case .failed(let msg):
+            Text(msg).font(.caption).foregroundStyle(.orange).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        default: EmptyView()
+        }
     }
 }

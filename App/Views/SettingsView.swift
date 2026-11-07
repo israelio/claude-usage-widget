@@ -29,6 +29,10 @@ struct SettingsView: View {
                     .onSubmit(commitThresholds)
                     .onChange(of: thresholdFocused) { _, f in if !f { commitThresholds() } }
             }
+            Section("Updates") {
+                Toggle("Install updates automatically", isOn: $settings.prefs.autoUpdate)
+                Text("Checks GitHub for new releases every 6 hours.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Fallback estimate (used only when the usage API is unavailable)") {
                 Stepper("5h budget: \(Format.tokens(settings.prefs.planLimits.fiveHourTokens))",
                         value: $settings.prefs.planLimits.fiveHourTokens, in: 100_000...100_000_000, step: 500_000)

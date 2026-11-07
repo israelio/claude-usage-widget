@@ -18,6 +18,7 @@ struct ClaudeUsageApp: App {
         let s = AppSettings()
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
+        Updater.shared.configure(settings: s)
     }
 
     var body: some Scene {
@@ -25,7 +26,7 @@ struct ClaudeUsageApp: App {
             MenuBarPopover(service: service)
         } label: {
             LabelHost(service: service, settings: settings)
-                .onAppear { service.start(); syncPanel() }   // start() also performs the first refresh
+                .onAppear { service.start(); Updater.shared.start(); syncPanel() }   // start() also performs the first refresh
         }
         .menuBarExtraStyle(.window)
         .onChange(of: settings.prefs.floatingPanel) { _, _ in syncPanel() }

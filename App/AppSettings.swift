@@ -13,9 +13,10 @@ struct Prefs: Codable, Equatable {
     var alerts = AlertSettings()
     var planLimits = PlanLimits()
     var prices = PriceTable.defaults
+    var autoUpdate = true
 
     init() {}
-    private enum CodingKeys: String, CodingKey { case menuBarMode, floatingPanel, pollSeconds, alerts, planLimits, prices }
+    private enum CodingKeys: String, CodingKey { case menuBarMode, floatingPanel, pollSeconds, alerts, planLimits, prices, autoUpdate }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         menuBarMode = try c.decodeIfPresent(MenuBarMode.self, forKey: .menuBarMode) ?? .sessionWeekly
@@ -24,6 +25,7 @@ struct Prefs: Codable, Equatable {
         alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? AlertSettings()
         planLimits = try c.decodeIfPresent(PlanLimits.self, forKey: .planLimits) ?? PlanLimits()
         prices = try c.decodeIfPresent(PriceTable.self, forKey: .prices) ?? .defaults
+        autoUpdate = try c.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? true
     }
 }
 

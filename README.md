@@ -57,6 +57,10 @@ More:
 5. Look for the usage label in your menu bar. Click it to open the panel.
 6. For the desktop widgets: right-click the desktop → **Edit Widgets** → search "Claude Usage".
 
+## Updates
+
+The app checks GitHub Releases every 6 hours. When a newer version exists it downloads the DMG, verifies the SHA-256 checksum and that the new app is notarized and signed by the same Developer ID team, then replaces itself and restarts. Turn this off under Settings > Updates ("Install updates automatically"); you will then get a notification instead. You can also use "Check for updates" in the About popover. Builds without a team ID (unsigned or development builds) only notify and link to the release page.
+
 ## Why does it ask for Keychain access?
 
 On first launch macOS shows: *"Claude Usage wants to use your confidential information stored in 'Claude Code-credentials' in your keychain."* This is expected.

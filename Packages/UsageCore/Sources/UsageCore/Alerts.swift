@@ -72,6 +72,7 @@ public struct AlertMessage: Equatable, Sendable {
     public var id: String
     public var title: String
     public var body: String
+    public init(id: String, title: String, body: String) { self.id = id; self.title = title; self.body = body }
 }
 
 public enum AlertEngine {

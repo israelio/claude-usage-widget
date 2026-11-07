@@ -31,6 +31,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSUIElement: true
         AppGroupID: $(APP_GROUP_ID)
+        UpdateTeamID: $(DEVELOPMENT_TEAM)
         NSUserNotificationsUsageDescription: Usage alerts for your Claude limits.
     entitlements:
       path: App/App.entitlements

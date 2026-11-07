@@ -26,5 +26,7 @@
 	<true/>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Usage alerts for your Claude limits.</string>
+	<key>UpdateTeamID</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
 </dict>
 </plist>
