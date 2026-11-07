@@ -23,6 +23,13 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
   </tr>
 </table>
 
+### Desktop widgets
+
+<p align="center">
+  <img src="docs/images/widgets.png" alt="Claude Usage desktop widgets in small, medium and large sizes" width="260"><br>
+  <sub>Small, medium and large widgets. Add them from <b>Edit Widgets</b> on the desktop; click a widget to open the panel.</sub>
+</p>
+
 ## Features
 
 Top to bottom, the panel shows its title and version, then:
