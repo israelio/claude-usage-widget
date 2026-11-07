@@ -80,3 +80,17 @@ final class LimitsClientTests: XCTestCase {
         catch { XCTAssertEqual(error as? LimitsError, .http(500)) }
     }
 }
+
+final class LimitsTimeoutTests: XCTestCase {
+    struct BlockingTokens: TokenProviding {
+        func accessToken() throws -> String { Thread.sleep(forTimeInterval: 5); return "t" }
+    }
+    func testFetchTimesOutWhileTokenReadBlocks() async {
+        let c = OAuthLimitsClient(tokens: BlockingTokens(), transport: { _ in throw LimitsError.badResponse }, timeout: 0.3)
+        let start = Date()
+        do { _ = try await c.fetch(); XCTFail("expected timeout") }
+        catch { XCTAssertEqual(error as? LimitsError, .timeout) }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 3)
+        XCTAssertEqual(LimitsError.timeout.errorDescription, "Timed out waiting for Keychain/usage API")
+    }
+}

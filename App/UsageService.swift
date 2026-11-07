@@ -54,6 +54,16 @@ final class UsageService: ObservableObject {
         let prefs = settings.prefs
         let hist = await ingestor.refreshLogs(now: now)
 
+        // Publish local data immediately so the UI/widget don't wait on Keychain or network.
+        let estimate = LocalEstimator.estimate(records: hist.recent, limits: prefs.planLimits, now: now)
+        let early = Aggregator.summarize(await ingestor.current(), prices: prefs.prices, now: now)
+        let earlyHist = await ingestor.current()
+        history = earlyHist; summary = early
+        if limits == nil {
+            limits = estimate
+            writeSnapshot(estimate, early, earlyHist, now)
+        }
+
         var snap: LimitsSnapshot
         do {
             snap = try await client.fetch()
@@ -61,17 +71,20 @@ final class UsageService: ObservableObject {
             await ingestor.record(snap)
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            snap = LocalEstimator.estimate(records: hist.recent, limits: prefs.planLimits, now: now)
+            snap = estimate
         }
         let hist2 = await ingestor.current()
         let sum = Aggregator.summarize(hist2, prices: prefs.prices, now: now)
 
-        var msgs = AlertEngine.evaluate(current: snap, previous: previous, settings: prefs.alerts, fired: &fired, now: now)
+        var msgs: [AlertMessage] = []
+        if !snap.isEstimated {
+            msgs += AlertEngine.evaluate(current: snap, previous: previous, settings: prefs.alerts, fired: &fired, now: now)
+        }
         msgs += AlertEngine.digests(summary: sum, settings: prefs.alerts, fired: &fired, now: now)
         msgs.forEach(Notifier.post)
         if let d = try? JSONEncoder().encode(fired) { UserDefaults.standard.set(d, forKey: Self.firedKey) }
 
-        previous = snap
+        if !snap.isEstimated { previous = snap }
         limits = snap; summary = sum; history = hist2
         writeSnapshot(snap, sum, hist2, now)
     }

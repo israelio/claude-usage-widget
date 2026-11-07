@@ -2,13 +2,14 @@ import Foundation
 import Security
 
 public enum LimitsError: Error, Equatable, LocalizedError {
-    case noToken, unauthorized, http(Int), badResponse
+    case noToken, unauthorized, http(Int), badResponse, timeout
     public var errorDescription: String? {
         switch self {
         case .noToken: return "No Claude Code login found in Keychain"
         case .unauthorized: return "Login expired — run Claude Code to sign in again"
         case .http(let c): return "Usage API error (HTTP \(c))"
         case .badResponse: return "Unexpected usage API response"
+        case .timeout: return "Timed out waiting for Keychain/usage API"
         }
     }
 }
@@ -85,9 +86,11 @@ public struct OAuthLimitsClient: LimitsProviding {
     public typealias Transport = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
     private let tokens: TokenProviding
     private let transport: Transport
+    private let timeout: TimeInterval
 
-    public init(tokens: TokenProviding = KeychainTokenProvider(), transport: @escaping Transport = OAuthLimitsClient.live) {
-        self.tokens = tokens; self.transport = transport
+    public init(tokens: TokenProviding = KeychainTokenProvider(), transport: @escaping Transport = OAuthLimitsClient.live,
+                timeout: TimeInterval = 60) {
+        self.tokens = tokens; self.transport = transport; self.timeout = timeout
     }
 
     public static let live: Transport = { req in
@@ -96,8 +99,35 @@ public struct OAuthLimitsClient: LimitsProviding {
         return (data, http)
     }
 
+    /// Fetches limits, giving up with `LimitsError.timeout` after `timeout` seconds. The token read (which can
+    /// block on a Keychain permission dialog) runs on a global queue, and the race uses continuations so the
+    /// timeout can return even while that blocking call is still pending.
     public func fetch() async throws -> LimitsSnapshot {
-        let token = try tokens.accessToken()
+        let seconds = timeout
+        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<LimitsSnapshot, Error>) in
+            let once = OnceGate()
+            let work = Task {
+                do {
+                    let snap = try await self.fetchUnbounded()
+                    if once.claim() { cont.resume(returning: snap) }
+                } catch {
+                    if once.claim() { cont.resume(throwing: error) }
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                if once.claim() { work.cancel(); cont.resume(throwing: LimitsError.timeout) }
+            }
+        }
+    }
+
+    private func fetchUnbounded() async throws -> LimitsSnapshot {
+        let tokens = self.tokens
+        let token: String = try await withCheckedThrowingContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                cont.resume(with: Result { try tokens.accessToken() })
+            }
+        }
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
@@ -110,4 +140,10 @@ public struct OAuthLimitsClient: LimitsProviding {
         default: throw LimitsError.http(resp.statusCode)
         }
     }
+}
+
+private final class OnceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
 }
