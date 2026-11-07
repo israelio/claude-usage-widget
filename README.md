@@ -18,3 +18,8 @@ Core logic lives in `Packages/UsageCore`; run its tests with `cd Packages/UsageC
 
 - Costs are API-equivalent estimates computed from local logs in `~/.claude/projects` and the editable price table. They are not what a subscription plan bills.
 - Live limits come from an undocumented Claude usage endpoint, using the Claude Code OAuth token from the Keychain (macOS asks for access on first launch). The endpoint may change or break. When it is unavailable, the app falls back to a local estimate based on configurable token budgets and marks it as estimated.
+
+## ⭐ Staraware
+
+Made by Ohad Israeli. This app is **staraware**: instead of paying, pay with a star.
+If you like it, please star the repo: https://github.com/israelio/claude-usage-widget

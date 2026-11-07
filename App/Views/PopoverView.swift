@@ -10,6 +10,7 @@ struct PopoverView: View {
     @ObservedObject var service: UsageService
     var openHistory: () -> Void
     var openSettings: () -> Void
+    @State private var showAbout = false
 
     var body: some View {
         ScrollView {
@@ -63,6 +64,9 @@ struct PopoverView: View {
                 Button { service.refreshNow() } label: { Image(systemName: "arrow.clockwise") }
                 Button { openHistory() } label: { Image(systemName: "chart.bar.doc.horizontal") }
                 Button { openSettings() } label: { Image(systemName: "gearshape") }
+                Button { showAbout.toggle() } label: { Image(systemName: "star.circle") }
+                    .help("About — Staraware: pay with a GitHub star")
+                    .popover(isPresented: $showAbout, arrowEdge: .top) { AboutView() }
                 Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
             }.buttonStyle(.plain).font(.system(size: 13))
         }
