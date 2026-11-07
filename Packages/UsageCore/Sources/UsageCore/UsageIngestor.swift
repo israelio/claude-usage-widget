@@ -1,28 +1,41 @@
 import Foundation
 
 public actor UsageIngestor {
-    private var history: HistoryData
-    private let scanner: LogScanner
+    private var history = HistoryData()
+    private var scanner: LogScanner?
+    private let logsRoot: URL
     private let storeURL: URL
 
     public init(logsRoot: URL, storeURL: URL) {
+        self.logsRoot = logsRoot
         self.storeURL = storeURL
-        let loaded = Self.load(storeURL)
-        self.history = loaded
-        self.scanner = LogScanner(root: logsRoot, state: loaded.scan)
     }
 
-    /// Scans new log lines, rolls them up, prunes, persists, returns a copy.
+    /// Loads history from disk on first use (inside the actor, off the main thread).
+    private func ensureLoaded() -> LogScanner {
+        if let s = scanner { return s }
+        let h = Self.load(storeURL)
+        history = h
+        let s = LogScanner(root: logsRoot, state: h.scan)
+        scanner = s
+        return s
+    }
+
+    /// Scans new log lines, rolls them up, prunes, persists only if something changed, returns a copy.
     public func refreshLogs(now: Date = Date()) -> HistoryData {
+        let scanner = ensureLoaded()
         let new = scanner.scan(now: now)
+        var changed = !new.isEmpty
         history.add(new)
-        history.scan = scanner.state
-        history.prune(now: now)
-        save()
+        if history.scan != scanner.state { history.scan = scanner.state; changed = true }
+        if history.prune(now: now) { changed = true }
+        // Keep the scanner's view in sync with pruned `seen`.
+        if changed { scanner.state = history.scan; save() }
         return history
     }
 
     public func record(_ snapshot: LimitsSnapshot) {
+        _ = ensureLoaded()
         guard !snapshot.isEstimated else { return }
         history.add(sample: LimitSample(t: snapshot.fetchedAt, fiveHour: snapshot.fiveHour?.utilization,
                                         fiveHourReset: snapshot.fiveHour?.resetsAt,
@@ -30,7 +43,7 @@ public actor UsageIngestor {
         save()
     }
 
-    public func current() -> HistoryData { history }
+    public func current() -> HistoryData { _ = ensureLoaded(); return history }
 
     private func save() {
         try? FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -41,6 +54,11 @@ public actor UsageIngestor {
     private static func load(_ url: URL) -> HistoryData {
         guard let d = try? Data(contentsOf: url) else { return HistoryData() }
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        return (try? dec.decode(HistoryData.self, from: d)) ?? HistoryData()
+        if let h = try? dec.decode(HistoryData.self, from: d) { return h }
+        // Unreadable: keep the bytes around rather than overwriting them with an empty history.
+        let bak = url.appendingPathExtension("bak")
+        try? FileManager.default.removeItem(at: bak)
+        try? FileManager.default.moveItem(at: url, to: bak)
+        return HistoryData()
     }
 }
