@@ -10,11 +10,55 @@ public struct AlertSettings: Codable, Equatable, Sendable {
     public var quietStartHour: Int? = nil
     public var quietEndHour: Int? = nil
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case thresholds, burnRate, resetNotice, dailyDigest, weeklyDigest, digestHour, quietStartHour, quietEndHour
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AlertSettings()
+        thresholds = try c.decodeIfPresent([Int].self, forKey: .thresholds) ?? d.thresholds
+        burnRate = try c.decodeIfPresent(Bool.self, forKey: .burnRate) ?? d.burnRate
+        resetNotice = try c.decodeIfPresent(Bool.self, forKey: .resetNotice) ?? d.resetNotice
+        dailyDigest = try c.decodeIfPresent(Bool.self, forKey: .dailyDigest) ?? d.dailyDigest
+        weeklyDigest = try c.decodeIfPresent(Bool.self, forKey: .weeklyDigest) ?? d.weeklyDigest
+        digestHour = try c.decodeIfPresent(Int.self, forKey: .digestHour) ?? d.digestHour
+        quietStartHour = try c.decodeIfPresent(Int.self, forKey: .quietStartHour)
+        quietEndHour = try c.decodeIfPresent(Int.self, forKey: .quietEndHour)
+    }
 }
 
 public struct FiredState: Codable, Equatable, Sendable {
     public var keys: [String] = []
+    /// Last adopted reset time per window tag; gives each window a stable identity despite jitter.
+    public var lastReset: [String: Date] = [:]
     public init() {}
+
+    private enum CodingKeys: String, CodingKey { case keys, lastReset }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        keys = try c.decodeIfPresent([String].self, forKey: .keys) ?? []
+        lastReset = try c.decodeIfPresent([String: Date].self, forKey: .lastReset) ?? [:]
+    }
+
+    /// Stable key for a window: reuses the stored reset time if the new one is within 600s, else adopts the new one.
+    mutating func windowKey(tag: String, reset: Date?) -> String {
+        guard let r = reset else { return "none" }
+        if let stored = lastReset[tag], abs(r.timeIntervalSince(stored)) <= 600 {
+            return String(Int(stored.timeIntervalSince1970))
+        }
+        lastReset[tag] = r
+        return String(Int(r.timeIntervalSince1970))
+    }
+
+    /// Like `windowKey` but never changes state.
+    func peekWindowKey(tag: String, reset: Date?) -> String {
+        guard let r = reset else { return "none" }
+        if let stored = lastReset[tag], abs(r.timeIntervalSince(stored)) <= 600 {
+            return String(Int(stored.timeIntervalSince1970))
+        }
+        return String(Int(r.timeIntervalSince1970))
+    }
     /// Returns true if `key` was not seen before (and records it).
     public mutating func fire(_ key: String) -> Bool {
         guard !keys.contains(key) else { return false }
@@ -31,7 +75,7 @@ public struct AlertMessage: Equatable, Sendable {
 }
 
 public enum AlertEngine {
-    static func isQuiet(_ s: AlertSettings, now: Date, calendar: Calendar) -> Bool {
+    public static func isQuiet(_ s: AlertSettings, now: Date, calendar: Calendar = .current) -> Bool {
         guard let a = s.quietStartHour, let b = s.quietEndHour, a != b else { return false }
         let h = calendar.component(.hour, from: now)
         return a < b ? (h >= a && h < b) : (h >= a || h < b)
@@ -47,7 +91,9 @@ public enum AlertEngine {
         ]
         for w in windows {
             guard let cur = w.cur else { continue }
-            let rkey = windowKey(cur.resetsAt)
+            // Compute the ended window's key before adopting the current one.
+            let prevKey = w.prev.map { fired.peekWindowKey(tag: w.tag, reset: $0.resetsAt) }
+            let rkey = fired.windowKey(tag: w.tag, reset: cur.resetsAt)
             let pct = Int(cur.utilization.rounded())
 
             let sorted = settings.thresholds.sorted()
@@ -64,11 +110,13 @@ public enum AlertEngine {
                 out.append(AlertMessage(id: "burn-\(w.tag)-\(rkey)", title: "Burning through your \(w.name)",
                                         body: "At this pace you'll hit ~\(Int(p.projected.rounded()))% before it resets."))
             }
-            if settings.resetNotice, let prev = w.prev, prev.utilization >= 75,
-               let pr = prev.resetsAt, let cr = cur.resetsAt, cr.timeIntervalSince(pr) > 600,
-               fired.fire("reset-\(w.tag)-\(rkey)") {
-                out.append(AlertMessage(id: "reset-\(w.tag)-\(rkey)", title: "\(w.name.capitalized) reset",
-                                        body: "Usage is back to \(pct)%."))
+            if settings.resetNotice, let prev = w.prev, let pr = prev.resetsAt, let pk = prevKey {
+                let expired = pr <= now && cur.utilization < prev.utilization
+                let rolled = prev.utilization >= 75 && (cur.resetsAt.map { $0.timeIntervalSince(pr) > 600 } ?? true)
+                if (expired || rolled), fired.fire("reset-\(w.tag)-\(pk)") {
+                    out.append(AlertMessage(id: "reset-\(w.tag)-\(pk)", title: "\(w.name.capitalized) reset",
+                                            body: "Usage is back to \(pct)%."))
+                }
             }
         }
         return out
@@ -90,12 +138,6 @@ public enum AlertEngine {
             out.append(AlertMessage(id: "digest-w-\(day)", title: "Last 7 days of Claude usage", body: line(summary.last7)))
         }
         return out
-    }
-
-    /// Reset times jitter by seconds between fetches; bucket to 10 minutes so one window == one key.
-    static func windowKey(_ reset: Date?) -> String {
-        guard let r = reset else { return "none" }
-        return String(Int((r.timeIntervalSince1970 / 600).rounded()))
     }
 
     private static func resetSuffix(_ w: LimitWindow, now: Date) -> String {

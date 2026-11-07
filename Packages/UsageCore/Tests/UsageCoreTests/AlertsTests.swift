@@ -60,3 +60,72 @@ final class AlertsTests: XCTestCase {
         XCTAssertTrue(AlertEngine.digests(summary: sum, settings: early, fired: &f2, now: now, calendar: cal).isEmpty)
     }
 }
+
+final class AlertsResetTests: XCTestCase {
+    var cal: Calendar = { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }()
+    let now = ISODate.parse("2026-11-09T12:00:00Z")!
+    func snap(_ u: Double, reset: Date?, week: Double = 5) -> LimitsSnapshot {
+        LimitsSnapshot(fetchedAt: now, fiveHour: LimitWindow(utilization: u, resetsAt: reset),
+                       sevenDay: LimitWindow(utilization: week, resetsAt: now.addingTimeInterval(3 * 86400)))
+    }
+    func quiet() -> AlertSettings { var s = AlertSettings(); s.thresholds = []; s.burnRate = false; return s }
+    func eval(_ cur: LimitsSnapshot, _ prev: LimitsSnapshot?, _ s: AlertSettings, _ f: inout FiredState, at t: Date? = nil) -> [AlertMessage] {
+        AlertEngine.evaluate(current: cur, previous: prev, settings: s, fired: &f, now: t ?? now, calendar: cal)
+    }
+
+    func testIdleResetWithNilResetsAt() {
+        var f = FiredState()
+        let prev = snap(80, reset: now.addingTimeInterval(120))
+        let cur = snap(0, reset: nil)
+        let m = eval(cur, prev, quiet(), &f)
+        XCTAssertEqual(m.filter { $0.id.hasPrefix("reset-5h") }.count, 1)
+        // A later idle reset of a new window must fire again.
+        let prev2 = snap(90, reset: now.addingTimeInterval(86400 + 120))
+        let m2 = eval(snap(0, reset: nil), prev2, quiet(), &f)
+        XCTAssertEqual(m2.filter { $0.id.hasPrefix("reset-5h") }.count, 1)
+    }
+
+    func testExpiredWindowWithLowerUtilizationIsReset() {
+        var f = FiredState()
+        let prev = snap(30, reset: now.addingTimeInterval(-60))
+        let m = eval(snap(3, reset: now.addingTimeInterval(5 * 3600)), prev, quiet(), &f)
+        XCTAssertEqual(m.filter { $0.id.hasPrefix("reset-5h") }.count, 1)
+    }
+
+    func testNoResetWhenSameWindow() {
+        var f = FiredState()
+        let r = now.addingTimeInterval(3600)
+        XCTAssertTrue(eval(snap(81, reset: r), snap(80, reset: r.addingTimeInterval(5)), quiet(), &f).isEmpty)
+    }
+
+    func testResetsAtJitterAcrossOldBucketBoundaryDoesNotRefire() {
+        var f = FiredState(); var s = AlertSettings(); s.resetNotice = false
+        // Old buckets were multiples of 600s; straddle one.
+        let boundary = Date(timeIntervalSince1970: ceil(now.addingTimeInterval(4 * 3600).timeIntervalSince1970 / 600) * 600 + 300)
+        let a = eval(snap(95, reset: boundary.addingTimeInterval(-90)), nil, s, &f)
+        XCTAssertFalse(a.isEmpty)
+        let b = eval(snap(96, reset: boundary.addingTimeInterval(90)), nil, s, &f)
+        XCTAssertTrue(b.isEmpty, "jitter must not refire thresholds/burn: \(b)")
+        let c = eval(snap(96, reset: boundary.addingTimeInterval(-90)), nil, s, &f)
+        XCTAssertTrue(c.isEmpty)
+    }
+
+    func testNewWindowAdoptsNewKey() {
+        var f = FiredState(); var s = AlertSettings(); s.burnRate = false
+        _ = eval(snap(80, reset: now.addingTimeInterval(3600)), nil, s, &f)
+        let m = eval(snap(80, reset: now.addingTimeInterval(3600 + 5 * 3600)), nil, s, &f)
+        XCTAssertFalse(m.isEmpty)
+    }
+
+    func testFiredStateDecodesLegacy() throws {
+        let f = try JSONDecoder().decode(FiredState.self, from: Data(#"{"keys":["a"]}"#.utf8))
+        XCTAssertEqual(f.keys, ["a"]); XCTAssertTrue(f.lastReset.isEmpty)
+        let a = try JSONDecoder().decode(AlertSettings.self, from: Data(#"{"burnRate":false}"#.utf8))
+        XCTAssertFalse(a.burnRate); XCTAssertEqual(a.thresholds, [50, 75, 90])
+    }
+
+    func testIsQuietPublic() {
+        var s = AlertSettings(); s.quietStartHour = 11; s.quietEndHour = 13
+        XCTAssertTrue(AlertEngine.isQuiet(s, now: now, calendar: cal))
+    }
+}
