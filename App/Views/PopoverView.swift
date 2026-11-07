@@ -58,17 +58,18 @@ struct PopoverView: View {
 
     private var footer: some View {
         GlassCard {
-            HStack(spacing: 14) {
-                Button { NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!) } label: { Label("Claude", systemImage: "arrow.up.right.square") }
+            HStack(spacing: 6) {
+                FlatIconButton(systemImage: "arrow.up.right.square", title: "Claude", help: "Open your usage page on claude.ai") {
+                    NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!)
+                }
                 Spacer()
-                Button { service.refreshNow() } label: { Image(systemName: "arrow.clockwise") }
-                Button { openHistory() } label: { Image(systemName: "chart.bar.doc.horizontal") }
-                Button { openSettings() } label: { Image(systemName: "gearshape") }
-                Button { showAbout.toggle() } label: { Image(systemName: "star.circle") }
-                    .help("About — Staraware: pay with a GitHub star")
+                FlatIconButton(systemImage: "arrow.clockwise", help: "Refresh now") { service.refreshNow() }
+                FlatIconButton(systemImage: "chart.bar.doc.horizontal", help: "90-day usage history") { openHistory() }
+                FlatIconButton(systemImage: "gearshape", help: "Settings") { openSettings() }
+                FlatIconButton(systemImage: "star.circle", help: "About — Staraware: pay with a GitHub star") { showAbout.toggle() }
                     .popover(isPresented: $showAbout, arrowEdge: .top) { AboutView() }
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-            }.buttonStyle(.plain).font(.system(size: 13))
+                FlatIconButton(systemImage: "power", help: "Quit Claude Usage", hoverTint: .red) { NSApp.terminate(nil) }
+            }
         }
     }
 }
