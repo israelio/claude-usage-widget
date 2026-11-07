@@ -10,8 +10,8 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "gauge.with.dots.needle.50percent")
-                .font(.system(size: 34)).foregroundStyle(.orange)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().frame(width: 72, height: 72)
             Text("Claude Usage").font(.title3.bold())
             Text("Version \(version)").font(.caption).foregroundStyle(.secondary)
 
