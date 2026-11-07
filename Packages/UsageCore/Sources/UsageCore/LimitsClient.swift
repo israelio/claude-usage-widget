@@ -16,19 +16,43 @@ public enum LimitsError: Error, Equatable, LocalizedError {
 public protocol LimitsProviding: Sendable { func fetch() async throws -> LimitsSnapshot }
 public protocol TokenProviding: Sendable { func accessToken() throws -> String }
 
-// Response shape (verified in Task 6 Step 1): top-level keys five_hour, seven_day, seven_day_<model>,
-// each {"utilization": <percent>, "resets_at": <ISO8601|null>}. Other keys are ignored.
+// Response shape (verified live 2026-11-07): top-level `five_hour` and `seven_day` are
+// {"utilization": <percent 0-100>, "resets_at": "2026-11-07T18:00:00.134955+00:00" | null, "limit_dollars": null, ...}
+// (6 fractional digits, +00:00 offset). Many other top-level keys (seven_day_opus, seven_day_sonnet, ...) are null
+// and ignored. A top-level `limits` array holds items {"kind": "session"|"weekly_all"|"weekly_scoped", "percent": <0-100>,
+// "resets_at": ..., "scope": {"model": {"display_name": "Fable"}}}. `weekly_scoped` items give per-model weekly windows
+// (keyed by lowercased display_name); `session`/`weekly_all` duplicate five_hour/seven_day and are used only as a fallback.
+// A `seven_day_<name>` dict with `utilization` is kept as a secondary source for per-model windows.
 public enum LimitsDecoder {
     public static func decode(_ data: Data, now: Date = Date()) throws -> LimitsSnapshot {
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw LimitsError.badResponse }
         var snap = LimitsSnapshot(fetchedAt: now)
+        var legacy: [String: LimitWindow] = [:]
         for (key, value) in obj {
             guard let d = value as? [String: Any], let u = (d["utilization"] as? NSNumber)?.doubleValue else { continue }
             let w = LimitWindow(utilization: u, resetsAt: (d["resets_at"] as? String).flatMap(ISODate.parse))
             if key == "five_hour" { snap.fiveHour = w }
             else if key == "seven_day" { snap.sevenDay = w }
-            else if key.hasPrefix("seven_day_") { snap.extra[String(key.dropFirst("seven_day_".count))] = w }
+            else if key.hasPrefix("seven_day_") { legacy[String(key.dropFirst("seven_day_".count))] = w }
         }
+        var session: LimitWindow?, weeklyAll: LimitWindow?
+        for item in (obj["limits"] as? [[String: Any]]) ?? [] {
+            guard let p = (item["percent"] as? NSNumber)?.doubleValue else { continue }
+            let w = LimitWindow(utilization: p, resetsAt: (item["resets_at"] as? String).flatMap(ISODate.parse))
+            switch item["kind"] as? String {
+            case "session": session = session ?? w
+            case "weekly_all": weeklyAll = weeklyAll ?? w
+            case "weekly_scoped":
+                if let model = (item["scope"] as? [String: Any])?["model"] as? [String: Any],
+                   let name = model["display_name"] as? String, !name.isEmpty {
+                    snap.extra[name.lowercased()] = w
+                }
+            default: break
+            }
+        }
+        if snap.fiveHour == nil { snap.fiveHour = session }
+        if snap.sevenDay == nil { snap.sevenDay = weeklyAll }
+        for (k, w) in legacy where snap.extra[k] == nil { snap.extra[k] = w }
         guard snap.fiveHour != nil || snap.sevenDay != nil else { throw LimitsError.badResponse }
         return snap
     }

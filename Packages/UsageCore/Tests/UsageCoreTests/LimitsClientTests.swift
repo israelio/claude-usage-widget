@@ -3,22 +3,50 @@ import XCTest
 
 final class LimitsClientTests: XCTestCase {
     let sample = """
-    {"five_hour":{"utilization":42.0,"resets_at":"2026-11-07T18:20:00.123Z"},
-     "seven_day":{"utilization":71.5,"resets_at":"2026-11-11T18:00:00Z"},
-     "seven_day_fable":{"utilization":78,"resets_at":null},
-     "extra_usage":{"is_enabled":false}}
+    {"five_hour":{"utilization":43.0,"resets_at":"2026-11-07T18:00:00.134955+00:00","limit_dollars":null},
+     "seven_day":{"utilization":21.0,"resets_at":"2026-11-12T14:00:00.134955+00:00","limit_dollars":null},
+     "seven_day_opus":null,
+     "seven_day_sonnet":null,
+     "limits":[
+       {"kind":"session","group":"session","percent":43,"severity":"normal","resets_at":"2026-11-07T18:00:00+00:00","scope":null,"is_active":true},
+       {"kind":"weekly_all","group":"weekly","percent":21,"severity":"normal","resets_at":"2026-11-12T14:00:00+00:00","scope":null,"is_active":true},
+       {"kind":"weekly_scoped","group":"weekly","percent":0,"severity":"normal","resets_at":"2026-11-12T14:00:00+00:00","scope":{"model":{"id":null,"display_name":"Fable"},"surface":null},"is_active":false},
+       {"kind":"weekly_scoped","group":"weekly","percent":5,"severity":"normal","resets_at":null,"scope":{"model":{"id":null,"display_name":null},"surface":null},"is_active":false}
+     ],
+     "extra_usage":{"is_enabled":false,"monthly_limit":null,"used_credits":null}}
     """
 
     func testDecode() throws {
         let now = Date()
         let s = try LimitsDecoder.decode(Data(sample.utf8), now: now)
-        XCTAssertEqual(s.fiveHour?.utilization, 42)
+        XCTAssertEqual(s.fiveHour?.utilization, 43)
         XCTAssertNotNil(s.fiveHour?.resetsAt)
-        XCTAssertEqual(s.sevenDay?.utilization, 71.5)
-        XCTAssertEqual(s.extra["fable"]?.utilization, 78)
-        XCTAssertNil(s.extra["fable"]?.resetsAt)
+        XCTAssertEqual(s.sevenDay?.utilization, 21)
+        XCTAssertEqual(s.extra["fable"]?.utilization, 0)
+        XCTAssertNotNil(s.extra["fable"]?.resetsAt)
+        XCTAssertEqual(s.extra.count, 1)
         XCTAssertEqual(s.weeklyModel?.name, "fable")
         XCTAssertFalse(s.isEstimated)
+    }
+    func testDecodeFallsBackToLimitsArray() throws {
+        let json = #"{"limits":[{"kind":"session","percent":10,"resets_at":"2026-11-07T18:00:00+00:00"},{"kind":"weekly_all","percent":20,"resets_at":null}]}"#
+        let s = try LimitsDecoder.decode(Data(json.utf8))
+        XCTAssertEqual(s.fiveHour?.utilization, 10)
+        XCTAssertNotNil(s.fiveHour?.resetsAt)
+        XCTAssertEqual(s.sevenDay?.utilization, 20)
+    }
+    func testDecodeLegacyPrefixKey() throws {
+        let json = #"{"five_hour":{"utilization":1},"seven_day_fable":{"utilization":78,"resets_at":null}}"#
+        let s = try LimitsDecoder.decode(Data(json.utf8))
+        XCTAssertEqual(s.extra["fable"]?.utilization, 78)
+    }
+    func testISODateFormats() {
+        XCTAssertNotNil(ISODate.parse("2026-11-07T18:00:00.134955+00:00"))
+        XCTAssertNotNil(ISODate.parse("2026-11-07T18:00:00+00:00"))
+        XCTAssertNotNil(ISODate.parse("2026-11-07T18:20:00.123Z"))
+        XCTAssertNotNil(ISODate.parse("2026-11-11T18:00:00Z"))
+        XCTAssertEqual(ISODate.parse("2026-11-07T18:00:00.134955+00:00")!.timeIntervalSince1970,
+                       ISODate.parse("2026-11-07T18:00:00Z")!.timeIntervalSince1970, accuracy: 1)
     }
     func testDecodeRejectsGarbage() {
         XCTAssertThrowsError(try LimitsDecoder.decode(Data("[]".utf8)))
@@ -41,7 +69,7 @@ final class LimitsClientTests: XCTestCase {
     }
     func testFetchOK() async throws {
         let s = try await client(status: 200, body: sample).fetch()
-        XCTAssertEqual(s.fiveHour?.utilization, 42)
+        XCTAssertEqual(s.fiveHour?.utilization, 43)
     }
     func testFetch401() async {
         do { _ = try await client(status: 401, body: "{}").fetch(); XCTFail() }
