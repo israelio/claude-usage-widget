@@ -11,8 +11,9 @@ struct LimitCard: View {
     var body: some View {
         let pace = Pace.compute(window: window, length: length, now: Date())
         GlassCard(title: title, icon: icon, trailing: AnyView(header(pace))) {
-            ProgressView(value: min(1, max(0, window.utilization / 100)))
-                .tint(Theme.color(forUtilization: window.utilization))
+            UsageBar(fraction: window.utilization / 100, paceFraction: pace.map { $0.expected / 100 },
+                     color: Theme.color(forUtilization: window.utilization))
+                .help(pace.map { _ in "The white tick marks an even pace: where you would be right now if you used the window evenly. Fill short of the tick means you have room; past it means you're using it faster." } ?? usedHelp)
             HStack {
                 if let r = window.resetsAt {
                     Text("Resets in: \(Format.resetsIn(r)) at \(r.formatted(date: .omitted, time: .shortened))")
@@ -66,5 +67,31 @@ struct LimitCard: View {
         case .ahead: return "At your current rate you would reach about \(proj)% by the reset, right at the limit."
         case .over: return "At your current rate you would hit the limit before it resets (projected about \(proj)%)."
         }
+    }
+}
+
+/// Progress bar with a thin tick showing where an even burn rate would be right now.
+private struct UsageBar: View {
+    let fraction: Double
+    let paceFraction: Double?
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(.primary.opacity(0.12))
+                Capsule().fill(color).frame(width: max(6, w * min(1, max(0, fraction))))
+                if let p = paceFraction {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(.white.opacity(0.9))
+                        .frame(width: 2, height: 12)
+                        .shadow(color: .black.opacity(0.5), radius: 1)
+                        .offset(x: min(w - 2, max(0, w * min(1, max(0, p)) - 1)))
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 12)
     }
 }
