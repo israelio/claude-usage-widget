@@ -4,7 +4,7 @@ import UsageCore
 struct PopoverView: View {
     /// Tall enough to show every card without scrolling; capped to the screen so it never overflows.
     static var preferredHeight: CGFloat {
-        min(960, (NSScreen.main?.visibleFrame.height ?? 900) - 40)
+        min(1040, (NSScreen.main?.visibleFrame.height ?? 900) - 40)
     }
 
     @ObservedObject var service: UsageService
@@ -32,6 +32,7 @@ struct PopoverView: View {
                 }
                 DailyCard(service: service)
                 TokenCard(summary: service.summary)
+                if let p = service.plan { PlanCard(plan: p, extraUsage: service.limits?.extraUsage) }
                 GlassCard {
                     HStack {
                         Text("Next refresh in ").foregroundStyle(.secondary)

@@ -11,10 +11,15 @@ final class UsageService: ObservableObject {
     @Published private(set) var history = HistoryData()
     @Published private(set) var error: String?
     @Published private(set) var nextRefresh = Date()
+    @Published private(set) var plan: PlanInfo?
 
     let settings: AppSettings
     private let ingestor: UsageIngestor
     private let client: LimitsProviding
+    /// The same client instance (and so the same cached token provider) as `client`: no extra Keychain reads.
+    private let planClient: PlanProviding?
+    private var planFetchedAt: Date?
+    private static let planMaxAge: TimeInterval = 6 * 3600
     private let groupID: String
     private var previous: LimitsSnapshot?
     private var fired: FiredState
@@ -33,6 +38,7 @@ final class UsageService: ObservableObject {
     init(settings: AppSettings, client: LimitsProviding = OAuthLimitsClient()) {
         self.settings = settings
         self.client = client
+        self.planClient = client as? PlanProviding
         self.groupID = Bundle.main.object(forInfoDictionaryKey: "AppGroupID") as? String ?? ""
         self.groupAvailable = SharedSnapshot.groupURL(groupID: groupID) != nil
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -106,6 +112,7 @@ final class UsageService: ObservableObject {
                 if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
             }
         }
+        if fetched { await refreshPlanIfNeeded() }
         let now2 = Date()   // the fetch may have blocked on a Keychain prompt for a long time
         let hist2 = await ingestor.current()
         let sum = Aggregator.summarize(hist2, prices: prefs.prices, now: now2)
@@ -122,6 +129,13 @@ final class UsageService: ObservableObject {
 
         limits = snap; summary = sum; history = hist2
         writeSnapshot(snap, sum, hist2, now2)
+    }
+
+    /// Silent on failure: keeps the previous plan and retries on a later successful poll.
+    private func refreshPlanIfNeeded() async {
+        if plan != nil, let t = planFetchedAt, Date().timeIntervalSince(t) < Self.planMaxAge { return }
+        guard let planClient, let p = try? await planClient.fetchPlan() else { return }
+        plan = p; planFetchedAt = Date()
     }
 
     func daily(days: Int) -> [DailyPoint] {
