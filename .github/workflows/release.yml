@@ -1,0 +1,57 @@
+name: Release
+# Push a tag like v1.2.3 to build a DMG and publish a GitHub Release.
+# Or run manually from the Actions tab and enter a version (creates a draft release).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.2.3, no leading v)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$'; then
+            echo "Invalid version: $VERSION" >&2; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Test core
+        run: swift test --package-path Packages/UsageCore
+
+      - name: Build DMG
+        run: |
+          brew install xcodegen
+          scripts/make-dmg.sh "${{ steps.v.outputs.version }}" "${{ github.run_number }}"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: Claude Usage ${{ steps.v.outputs.version }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          generate_release_notes: true
+          body: |
+            **Staraware** ⭐ — instead of paying, pay with a star on the repo.
+
+            Download the DMG, drag **Claude Usage** to Applications. The app is ad-hoc signed (not notarized): on first launch right-click > Open, or run `xattr -dr com.apple.quarantine "/Applications/Claude Usage.app"`.
+            Desktop widgets need a build signed with your own Apple Team ID (see README).
+          files: |
+            dist/*.dmg
+            dist/*.sha256

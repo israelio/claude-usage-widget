@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: UsageCore tests
+        run: swift test --package-path Packages/UsageCore
+      - name: Build app (unsigned)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project ClaudeUsageWidget.xcodeproj -scheme ClaudeUsageWidget \
+            -configuration Debug -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build

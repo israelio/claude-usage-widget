@@ -10,6 +10,8 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
 packages:
   UsageCore:
     path: Packages/UsageCore
@@ -26,6 +28,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Claude Usage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSUIElement: true
         AppGroupID: $(APP_GROUP_ID)
         NSUserNotificationsUsageDescription: Usage alerts for your Claude limits.
@@ -48,6 +52,8 @@ targets:
       path: Widget/Info.plist
       properties:
         CFBundleDisplayName: Claude Usage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         AppGroupID: $(APP_GROUP_ID)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
