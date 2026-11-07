@@ -6,7 +6,7 @@ final class FloatingPanel: NSPanel {
     private var closeObserver: NSObjectProtocol?
 
     init<Content: View>(content: Content, onClose: @escaping () -> Void) {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 640),
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: PopoverView.preferredHeight),
                    styleMask: [.titled, .fullSizeContentView, .closable, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true

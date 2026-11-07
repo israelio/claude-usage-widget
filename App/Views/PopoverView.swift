@@ -2,6 +2,11 @@ import SwiftUI
 import UsageCore
 
 struct PopoverView: View {
+    /// Tall enough to show every card without scrolling; capped to the screen so it never overflows.
+    static var preferredHeight: CGFloat {
+        min(960, (NSScreen.main?.visibleFrame.height ?? 900) - 40)
+    }
+
     @ObservedObject var service: UsageService
     var openHistory: () -> Void
     var openSettings: () -> Void
@@ -46,7 +51,7 @@ struct PopoverView: View {
             }
             .padding(10)
         }
-        .frame(width: 360, height: 640)
+        .frame(width: 360, height: PopoverView.preferredHeight)
         .background(.regularMaterial)
     }
 
