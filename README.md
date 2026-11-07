@@ -2,6 +2,8 @@
 
 A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code usage** at a glance: 5-hour session, weekly limit, pace, 90-day token and cost history, and smart notifications.
 
+**[⬇️ Download the latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** · [All releases](https://github.com/israelio/claude-usage-widget/releases)
+
 > ⭐ **Staraware.** Instead of paying, pay with a star. If you like it, [star the repo](https://github.com/israelio/claude-usage-widget). Made by Ohad Israeli.
 
 ## Screenshot
@@ -45,15 +47,15 @@ More:
 
 ## Install
 
-Download the latest DMG from [Releases](https://github.com/israelio/claude-usage-widget/releases) and drag **Claude Usage** to Applications.
+1. Go to the **[latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** and download `ClaudeUsage-<version>.dmg` (a `.sha256` checksum is next to it).
+2. Open the DMG and drag **Claude Usage** onto **Applications**.
+3. First launch: the app is ad-hoc signed and not notarized, so right-click it in Applications and choose **Open** (then **Open** again). Or run:
 
-Release DMGs are ad-hoc signed and not notarized. On first launch right-click the app and choose **Open**, or run:
-
-```sh
-xattr -dr com.apple.quarantine "/Applications/Claude Usage.app"
-```
-
-On first launch macOS asks for access to the "Claude Code-credentials" Keychain item. Choose **Always Allow**.
+   ```sh
+   xattr -dr com.apple.quarantine "/Applications/Claude Usage.app"
+   ```
+4. macOS asks for access to the "Claude Code-credentials" Keychain item. Choose **Always Allow**.
+5. Look for the usage label in your menu bar. Click it to open the panel.
 
 Desktop widgets need a build signed with your own Apple Team ID, so build from source for those (below).
 
