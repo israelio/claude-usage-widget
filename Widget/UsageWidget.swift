@@ -30,42 +30,87 @@ private struct FreshnessCaption: View {
         if snapshot.limits?.isEstimated == true {
             Text("estimated").font(.system(size: 10)).foregroundStyle(.orange)
         } else {
-            Text("updated \(Text(snapshot.updatedAt, style: .relative)) ago").font(.system(size: 10)).foregroundStyle(.secondary)
+            Text("Updated \(snapshot.updatedAt.formatted(date: .omitted, time: .shortened))")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
         }
     }
 }
 
 private func color(_ u: Double) -> Color { u >= 85 ? .red : u >= 60 ? .orange : .green }
 
+/// macOS desktop widgets are often shown in a monochrome "accented" style where every colour becomes the same
+/// tint, so track and fill must differ by opacity, not just hue. Full-colour mode keeps green/orange/red.
+private struct Tone {
+    let mode: WidgetRenderingMode
+    var full: Bool { mode == .fullColor }
+    func fill(_ u: Double) -> Color { full ? color(u) : Color.primary }
+    var track: Color { Color.primary.opacity(0.22) }
+    var tick: Color { full ? Color.white : Color.primary }
+}
+
 struct Ring: View {
+    @Environment(\.widgetRenderingMode) private var mode
     let value: Double
     var body: some View {
+        let t = Tone(mode: mode)
         ZStack {
-            Circle().stroke(.secondary.opacity(0.25), lineWidth: 9)
-            Circle().trim(from: 0, to: min(1, value / 100)).stroke(color(value), style: StrokeStyle(lineWidth: 9, lineCap: .round))
+            Circle().stroke(t.track, lineWidth: 9)
+            Circle().trim(from: 0, to: max(0.02, min(1, value / 100)))
+                .stroke(t.fill(value), style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .widgetAccentable()
             Text("\(Int(value.rounded()))%").font(.system(size: 22, weight: .bold, design: .rounded))
         }
     }
 }
 
-struct Bar: View {
-    let title: String; let window: LimitWindow?
+/// Progress bar: dim track, solid fill, and a tick where an even burn rate would be right now.
+struct WBar: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    let fraction: Double
+    let pace: Double?
     var body: some View {
+        let t = Tone(mode: mode)
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(t.track)
+                Capsule().fill(t.fill(fraction * 100)).frame(width: max(6, w * min(1, max(0, fraction))))
+                    .widgetAccentable()
+                if let p = pace {
+                    RoundedRectangle(cornerRadius: 1).fill(t.tick).frame(width: 2, height: 11)
+                        .shadow(color: .black.opacity(0.4), radius: 1)
+                        .offset(x: min(w - 2, max(0, w * min(1, max(0, p)) - 1)))
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 11)
+    }
+}
+
+struct Bar: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    let title: String; let window: LimitWindow?; let length: TimeInterval; let now: Date
+    var body: some View {
+        let u = window?.utilization ?? 0
+        let pace = window.flatMap { Pace.compute(window: $0, length: length, now: now) }
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(title).font(.caption.bold())
                 Spacer()
                 Text(window.map { "\(Int($0.utilization.rounded()))%" } ?? "–").font(.caption.bold())
+                    .foregroundStyle(Tone(mode: mode).full ? color(u) : Color.primary)
             }
-            ProgressView(value: min(1, (window?.utilization ?? 0) / 100)).tint(color(window?.utilization ?? 0))
-            if let r = window?.resetsAt { Text("Resets in \(Format.resetsIn(r))").font(.system(size: 10)).foregroundStyle(.secondary) }
+            WBar(fraction: u / 100, pace: pace.map { $0.expected / 100 })
+            if let r = window?.resetsAt { Text("Resets in \(Format.resetsIn(r, now: now))").font(.system(size: 10)).foregroundStyle(.secondary) }
         }
     }
 }
 
 struct UsageWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var mode
     let entry: UsageEntry
 
     var body: some View {
@@ -81,20 +126,23 @@ struct UsageWidgetView: View {
                     }
                 case .systemMedium:
                     VStack(alignment: .leading, spacing: 10) {
-                        Bar(title: "5-Hour Session", window: l.fiveHour)
-                        Bar(title: "Weekly Limit", window: l.sevenDay)
+                        Bar(title: "5-Hour Session", window: l.fiveHour, length: Pace.fiveHours, now: entry.date)
+                        Bar(title: "Weekly Limit", window: l.sevenDay, length: Pace.week, now: entry.date)
                         Text("Today \(Format.cost(s.today.cost)) · \(Format.tokens(s.today.tokens.total)) tokens")
                             .font(.caption2).foregroundStyle(.secondary)
                         FreshnessCaption(snapshot: s)
                     }
                 default:
                     VStack(alignment: .leading, spacing: 10) {
-                        Bar(title: "5-Hour Session", window: l.fiveHour)
-                        Bar(title: "Weekly Limit", window: l.sevenDay)
-                        if let m = l.weeklyModel { Bar(title: "Weekly \(m.name.capitalized)", window: m.window) }
+                        Bar(title: "5-Hour Session", window: l.fiveHour, length: Pace.fiveHours, now: entry.date)
+                        Bar(title: "Weekly Limit", window: l.sevenDay, length: Pace.week, now: entry.date)
+                        if let m = l.weeklyModel { Bar(title: "Weekly \(m.name.capitalized)", window: m.window, length: Pace.week, now: entry.date) }
                         Chart(s.daily) { p in
-                            BarMark(x: .value("d", p.day, unit: .day), y: .value("c", p.cost)).foregroundStyle(.orange.gradient)
-                        }.frame(height: 70)
+                            BarMark(x: .value("d", p.day, unit: .day), y: .value("c", p.cost))
+                                .foregroundStyle(mode == .fullColor ? AnyShapeStyle(.orange.gradient) : AnyShapeStyle(Color.primary))
+                        }
+                        .chartYAxis { AxisMarks { v in AxisValueLabel { Text(Format.cost(v.as(Double.self) ?? 0)).font(.system(size: 9)) } } }
+                        .frame(height: 70)
                         HStack {
                             Text("Today \(Format.cost(s.today.cost))"); Spacer(); Text("7d \(Format.cost(s.last7.cost))")
                         }.font(.caption.bold())
