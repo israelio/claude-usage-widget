@@ -73,7 +73,7 @@ private struct LabelHost: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let tip = MenuBarLabel.tooltip(for: service.limits)
+        let tip = MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode)
         MenuBarLabel(service: service, settings: settings)
             .help(tip)
             .onChange(of: tip) { _, t in StatusItemTooltip.apply(t) }
@@ -82,7 +82,7 @@ private struct LabelHost: View {
             }
             .task {
                 try? await Task.sleep(nanoseconds: 800_000_000)
-                StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits))
+                StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode))
             }
             .onReceive(NotificationCenter.default.publisher(for: .openHistoryRequested)) { _ in
                 openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true)

@@ -27,23 +27,19 @@ struct MenuBarLabel: View {
 }
 
 extension MenuBarLabel {
-    /// Multi-line hover text for the menu bar item.
-    static func tooltip(for l: LimitsSnapshot?, now: Date = Date()) -> String {
-        guard let l else { return "Claude Usage — loading…" }
-        func line(_ name: String, _ w: LimitWindow, length: TimeInterval?) -> String {
-            var t = "\(name): \(Int(w.utilization.rounded()))% used"
-            if let r = w.resetsAt { t += " · resets in \(Format.resetsIn(r, now: now))" }
-            if let length, let p = Pace.compute(window: w, length: length, now: now) {
+    /// Short hover text that explains exactly the numbers shown in the menu bar label.
+    static func tooltip(for l: LimitsSnapshot?, mode: MenuBarMode, now: Date = Date()) -> String {
+        guard let l, let five = l.fiveHour else { return "Claude Usage — loading…" }
+        let suffix = l.isEstimated ? " (estimated)" : ""
+        var lines = ["\(Int(five.utilization.rounded()))% — 5-hour session used\(suffix)"]
+        guard mode != .iconOnly else { return lines[0] }
+        if mode == .sessionWeekly {
+            if let p = Pace.compute(window: five, length: Pace.fiveHours, now: now) {
                 let d = Int(p.delta.rounded())
-                t += d == 0 ? " · on even pace" : " · \(abs(d)) pts \(d < 0 ? "under" : "over") even pace"
+                lines.append("\(d >= 0 ? "▲" : "▼")\(abs(d))% — \(d >= 0 ? "above" : "below") an even pace (\(d >= 0 ? "faster" : "slower") than average use)")
             }
-            return t
+            if let w = l.sevenDay { lines.append("\(Int(w.utilization.rounded()))% — weekly limit used") }
         }
-        var lines = ["Claude Usage" + (l.isEstimated ? " (estimated)" : "")]
-        if let w = l.fiveHour { lines.append(line("5-hour session", w, length: Pace.fiveHours)) }
-        if let w = l.sevenDay { lines.append(line("Weekly limit", w, length: Pace.week)) }
-        if let m = l.weeklyModel { lines.append(line("Weekly \(m.name.capitalized)", m.window, length: Pace.week)) }
-        lines.append("Click to open")
         return lines.joined(separator: "\n")
     }
 }
