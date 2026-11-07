@@ -13,6 +13,8 @@ struct PopoverView: View {
     var openSettings: () -> Void
     /// Fixed height for the menu bar popover; nil lets the content fill its container (the resizable floating panel).
     var panelHeight: CGFloat? = PopoverView.preferredHeight
+    /// Reports the height the content wants (used by the floating panel to size itself to its content).
+    var onContentHeight: ((CGFloat) -> Void)? = nil
     @State private var showAbout = false
     @Environment(\.colorScheme) private var scheme
 
@@ -57,7 +59,9 @@ struct PopoverView: View {
                 footer
             }
             .padding(10)
+            .background(GeometryReader { g in Color.clear.preference(key: PopoverContentHeightKey.self, value: g.size.height) })
         }
+        .onPreferenceChange(PopoverContentHeightKey.self) { onContentHeight?($0) }
         .frame(width: 360, height: panelHeight)
         .background(
             ZStack {
@@ -96,4 +100,9 @@ struct PopoverView: View {
             }
         }
     }
+}
+
+struct PopoverContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

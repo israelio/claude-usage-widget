@@ -12,6 +12,7 @@ final class PanelController {
     /// A widget tap can arrive before the app's service is ready (cold launch); show as soon as it is.
     private var pendingShow = false
     private var pendingCentered = false
+    private var lastContentHeight: CGFloat = 0
 
     func configure(service: UsageService, settings: AppSettings) {
         self.service = service; self.settings = settings
@@ -24,20 +25,25 @@ final class PanelController {
         if panel == nil {
             panel = FloatingPanel(content: PopoverView(
                 service: service,
-                openHistory: { HistoryWindowController.shared.show() },
+                openHistory: { [weak self] in HistoryWindowController.shared.show(attachTo: self?.visiblePanel) },
                 openSettings: {
                     NSApp.activate(ignoringOtherApps: true)
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 },
-                panelHeight: nil),
+                panelHeight: nil,
+                onContentHeight: { [weak self] h in Task { @MainActor in self?.fitToContent(h) } }),
                 onClose: { Task { @MainActor in settings.prefs.floatingPanel = false } })
         }
         if let panel {
+            fitToContent(lastContentHeight)
             if centered, !panel.isVisible { center(panel) } else { fit(panel) }
         }
         panel?.orderFrontRegardless()
         if activate { NSApp.activate(ignoringOtherApps: true) }
     }
+
+    /// The panel, if it is currently on screen.
+    var visiblePanel: NSPanel? { panel?.isVisible == true ? panel : nil }
 
     func hide() { panel?.orderOut(nil) }
 
@@ -61,5 +67,21 @@ final class PanelController {
         f.origin.x = min(max(f.origin.x, area.minX), area.maxX - f.width)
         f.origin.y = min(max(f.origin.y, area.minY), area.maxY - f.height)
         if f != panel.frame { panel.setFrame(f, display: true) }
+    }
+
+    /// Size the panel to its content (plus the title bar), but never taller than the screen; the top edge stays put.
+    private func fitToContent(_ contentHeight: CGFloat) {
+        guard contentHeight > 0 else { return }
+        lastContentHeight = contentHeight
+        guard let panel else { return }
+        let titleBar = panel.frame.height - panel.contentLayoutRect.height
+        let area = (panel.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        let target = min(contentHeight + titleBar, area.height - 20)
+        guard abs(target - panel.frame.height) > 1 else { return }
+        var f = panel.frame
+        f.origin.y += f.height - target
+        f.size.height = target
+        panel.setFrame(f, display: true)
+        fit(panel)
     }
 }

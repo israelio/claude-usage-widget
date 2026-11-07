@@ -67,10 +67,14 @@ private struct LabelHost: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
             }
             .task {
-                // Developer convenience (used for README screenshots): `open Claude\ Usage.app --args --show-history`.
-                if CommandLine.arguments.contains("--show-history") {
+                // Developer conveniences (README screenshots / checks):
+                //   --show-history           opens History as the panel's button does (glued to the panel if visible)
+                //   --show-history-menubar   opens History as the menu bar popover's button does (free-standing)
+                let args = CommandLine.arguments
+                if args.contains("--show-history") || args.contains("--show-history-menubar") {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the pinned panel appear first
                     HistoryWindowController.shared.configure(service: service)
-                    HistoryWindowController.shared.show()
+                    HistoryWindowController.shared.show(attachTo: args.contains("--show-history") ? PanelController.shared.visiblePanel : nil)
                 }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode))
