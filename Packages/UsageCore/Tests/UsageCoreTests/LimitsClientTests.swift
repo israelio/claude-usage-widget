@@ -94,3 +94,23 @@ final class LimitsTimeoutTests: XCTestCase {
         XCTAssertEqual(LimitsError.timeout.errorDescription, "Timed out waiting for Keychain/usage API")
     }
 }
+
+final class KeychainGateTests: XCTestCase {
+    func testOnlyOneEntrant() {
+        let g = KeychainGate()
+        XCTAssertTrue(g.tryEnter())
+        XCTAssertFalse(g.tryEnter())
+        g.leave()
+        XCTAssertTrue(g.tryEnter())
+    }
+    func testSuccessDoesNotLeaveTimerFiring() async throws {
+        struct T: TokenProviding { func accessToken() throws -> String { "T" } }
+        let c = OAuthLimitsClient(tokens: T(), transport: { req in
+            (Data(#"{"five_hour":{"utilization":1,"resets_at":null}}"#.utf8),
+             HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }, timeout: 0.2)
+        let s = try await c.fetch()
+        XCTAssertEqual(s.fiveHour?.utilization, 1)
+        try await Task.sleep(nanoseconds: 400_000_000)
+    }
+}

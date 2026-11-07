@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 public enum LimitsError: Error, Equatable, LocalizedError {
-    case noToken, unauthorized, http(Int), badResponse, timeout
+    case noToken, unauthorized, http(Int), badResponse, timeout, keychainBusy
     public var errorDescription: String? {
         switch self {
         case .noToken: return "No Claude Code login found in Keychain"
@@ -10,6 +10,7 @@ public enum LimitsError: Error, Equatable, LocalizedError {
         case .http(let c): return "Usage API error (HTTP \(c))"
         case .badResponse: return "Unexpected usage API response"
         case .timeout: return "Timed out waiting for Keychain/usage API"
+        case .keychainBusy: return "Waiting for Keychain access — approve the prompt"
         }
     }
 }
@@ -59,9 +60,20 @@ public enum LimitsDecoder {
     }
 }
 
+/// Allows at most one blocking Keychain read at a time, so an unanswered prompt can't pile up threads.
+final class KeychainGate: @unchecked Sendable {
+    static let shared = KeychainGate()
+    private let lock = NSLock()
+    private var busy = false
+    func tryEnter() -> Bool { lock.lock(); defer { lock.unlock() }; if busy { return false }; busy = true; return true }
+    func leave() { lock.lock(); busy = false; lock.unlock() }
+}
+
 public struct KeychainTokenProvider: TokenProviding {
     public init() {}
     public func accessToken() throws -> String {
+        guard KeychainGate.shared.tryEnter() else { throw LimitsError.keychainBusy }
+        defer { KeychainGate.shared.leave() }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "Claude Code-credentials",
@@ -114,10 +126,12 @@ public struct OAuthLimitsClient: LimitsProviding {
                     if once.claim() { cont.resume(throwing: error) }
                 }
             }
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                if once.claim() { work.cancel(); cont.resume(throwing: LimitsError.timeout) }
+            let timer = Task {
+                // A cancelled sleep must not be mistaken for a timeout.
+                do { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) } catch { return }
+                if once.claim() { cont.resume(throwing: LimitsError.timeout) }
             }
+            once.onClaim { work.cancel(); timer.cancel() }
         }
     }
 
@@ -145,5 +159,21 @@ public struct OAuthLimitsClient: LimitsProviding {
 private final class OnceGate: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false
-    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
+    private var cleanup: (@Sendable () -> Void)?
+    func claim() -> Bool {
+        lock.lock()
+        if done { lock.unlock(); return false }
+        done = true
+        let c = cleanup
+        lock.unlock()
+        c?()
+        return true
+    }
+    /// Runs `block` when the gate is claimed (immediately if it already was).
+    func onClaim(_ block: @escaping @Sendable () -> Void) {
+        lock.lock()
+        if done { lock.unlock(); block(); return }
+        cleanup = block
+        lock.unlock()
+    }
 }
