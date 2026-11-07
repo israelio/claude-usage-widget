@@ -1,10 +1,6 @@
 import SwiftUI
 import AppKit
 
-extension Notification.Name {
-    static let openHistoryRequested = Notification.Name("ClaudeUsageWidget.openHistory")
-}
-
 @main
 struct ClaudeUsageApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -28,13 +24,13 @@ struct ClaudeUsageApp: App {
                 .onAppear {
                     // Hand the panel the app's real (installed) service; creating one in init() would be a separate copy.
                     PanelController.shared.configure(service: service, settings: settings)
+                    HistoryWindowController.shared.configure(service: service)
                     service.start(); Updater.shared.start(); syncPanel()
                 }   // start() also performs the first refresh
         }
         .menuBarExtraStyle(.window)
         .onChange(of: settings.prefs.floatingPanel) { _, _ in syncPanel() }
 
-        Window("Usage History", id: "history") { HistoryView(service: service) }
         Settings { SettingsView(settings: settings) }
     }
 
@@ -46,21 +42,19 @@ struct ClaudeUsageApp: App {
 /// Popover inside the MenuBarExtra, where SwiftUI environment actions work.
 private struct MenuBarPopover: View {
     @ObservedObject var service: UsageService
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         PopoverView(service: service,
-                    openHistory: { openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true) },
+                    openHistory: { HistoryWindowController.shared.show() },
                     openSettings: { NSApp.activate(ignoringOtherApps: true); openSettings() })
     }
 }
 
-/// Always-alive menu bar label; also services history requests coming from the floating panel.
+/// Always-alive menu bar label (also hosts the status item tooltip).
 private struct LabelHost: View {
     @ObservedObject var service: UsageService
     @ObservedObject var settings: AppSettings
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let tip = MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode)
@@ -73,13 +67,11 @@ private struct LabelHost: View {
             .task {
                 // Developer convenience (used for README screenshots): `open Claude\ Usage.app --args --show-history`.
                 if CommandLine.arguments.contains("--show-history") {
-                    openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true)
+                    HistoryWindowController.shared.configure(service: service)
+                    HistoryWindowController.shared.show()
                 }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode))
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openHistoryRequested)) { _ in
-                openWindow(id: "history"); NSApp.activate(ignoringOtherApps: true)
             }
     }
 }

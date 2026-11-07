@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Desktop widget taps arrive as claudeusage://open; a menu bar app has no window, so show the panel.
     func application(_ application: NSApplication, open urls: [URL]) {
         guard urls.contains(where: { $0.scheme == "claudeusage" }) else { return }
-        Task { @MainActor in PanelController.shared.show(activate: true) }
+        Task { @MainActor in PanelController.shared.show(activate: true, centered: true) }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
