@@ -16,7 +16,7 @@ struct RaisedIconButton: View {
                 if let title { Text(title) }
             }
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(hovering ? (hoverTint ?? .primary) : Color.primary.opacity(0.75))
+            .foregroundStyle(hovering ? (hoverTint ?? Color.white) : Color.white.opacity(0.80))
             .padding(.horizontal, title == nil ? 0 : 10)
             .frame(minWidth: 32, minHeight: 28)
         }
@@ -37,16 +37,16 @@ private struct RaisedButtonStyle: ButtonStyle {
         configuration.label
             .background(
                 ZStack {
-                    shape.fill(Color.primary.opacity(0.08))
+                    shape.fill(Color(red: 0.03, green: 0.03, blue: 0.04))
                     shape.fill(LinearGradient(
-                        colors: pressed ? [.black.opacity(0.30), .white.opacity(0.04)]
-                                        : [.white.opacity(hovering ? 0.30 : 0.20), .white.opacity(0.03)],
+                        colors: pressed ? [.black.opacity(0.40), .white.opacity(0.02)]
+                                        : [.white.opacity(hovering ? 0.20 : 0.11), .white.opacity(0.0)],
                         startPoint: .top, endPoint: .bottom))
-                    if hovering, let tint { shape.fill(tint.opacity(0.22)) }
+                    if hovering, let tint { shape.fill(tint.opacity(0.28)) }
                 }
             )
             .overlay(shape.strokeBorder(LinearGradient(
-                colors: [.white.opacity(pressed ? 0.10 : 0.50), .black.opacity(0.35)],
+                colors: [.white.opacity(pressed ? 0.08 : 0.38), .black.opacity(0.55)],
                 startPoint: .top, endPoint: .bottom), lineWidth: 1))
             .shadow(color: .black.opacity(pressed ? 0.15 : 0.45), radius: pressed ? 1 : 2.5, y: pressed ? 0.5 : 2)
             .offset(y: pressed ? 1 : 0)
