@@ -25,10 +25,20 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
 
 ### Desktop widgets
 
-<p align="center">
-  <img src="docs/images/widgets.png" alt="Claude Usage desktop widgets in small, medium and large sizes" width="260"><br>
-  <sub>Small, medium and large widgets. Add them from <b>Edit Widgets</b> on the desktop; click a widget to open the panel.</sub>
-</p>
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="docs/images/widgets-color.png" alt="Claude Usage desktop widgets in full-color style" width="240"><br>
+      <sub><b>Full-color style</b></sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="docs/images/widgets-mono.png" alt="Claude Usage desktop widgets in monochrome style" width="240"><br>
+      <sub><b>Monochrome style</b> (macOS default "Automatic")</sub>
+    </td>
+  </tr>
+</table>
+
+Small, medium and large widgets. Add them from **Edit Widgets** on the desktop and click a widget to open the panel. macOS shows desktop widgets in the monochrome style unless you pick **System Settings → Desktop & Dock → Widgets → Widget style → Full-color**; the widgets are readable in both.
 
 ## Features
 
