@@ -94,4 +94,4 @@ swift test --package-path Packages/UsageCore
 
 ## License
 
-No license file yet; add one (e.g. MIT) before accepting contributions.
+[MIT](LICENSE) © 2026 Ohad Israeli
