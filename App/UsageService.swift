@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 import WidgetKit
 import UsageCore
 
@@ -34,6 +35,7 @@ final class UsageService: ObservableObject {
     func start() {
         guard loop == nil else { return }
         Notifier.requestAuthorization()
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.refreshNow() } }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
