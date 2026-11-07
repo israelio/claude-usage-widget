@@ -16,7 +16,57 @@ public enum LimitsError: Error, Equatable, LocalizedError {
 }
 
 public protocol LimitsProviding: Sendable { func fetch() async throws -> LimitsSnapshot }
-public protocol TokenProviding: Sendable { func accessToken() throws -> String }
+public protocol TokenProviding: Sendable {
+    func accessToken() throws -> String
+    /// Called when the server rejects the token, so the next call may re-read it from its source.
+    func invalidate()
+}
+public extension TokenProviding { func invalidate() {} }
+
+public struct TokenCredentials: Equatable, Sendable {
+    public var token: String
+    public var expiresAt: Date?
+    public init(token: String, expiresAt: Date?) { self.token = token; self.expiresAt = expiresAt }
+}
+
+/// Keeps the OAuth token in memory so the Keychain (which may show a permission prompt) is read only
+/// when the token is about to expire or was rejected, not on every poll.
+public final class CachingTokenProvider: TokenProviding, @unchecked Sendable {
+    private struct Entry { var creds: TokenCredentials; var loadedAt: Date; var invalidated = false }
+    private let source: @Sendable () throws -> TokenCredentials
+    private let now: @Sendable () -> Date
+    private let skew: TimeInterval
+    private let minReload: TimeInterval
+    private let lock = NSLock()
+    private var entry: Entry?
+
+    /// - skew: treat the token as expired this many seconds before `expiresAt`.
+    /// - minReload: never re-read the source more often than this, even if the token looks expired/invalid.
+    public init(source: @escaping @Sendable () throws -> TokenCredentials,
+                now: @escaping @Sendable () -> Date = { Date() },
+                skew: TimeInterval = 60, minReload: TimeInterval = 120) {
+        self.source = source; self.now = now; self.skew = skew; self.minReload = minReload
+    }
+
+    public func accessToken() throws -> String {
+        lock.lock()
+        if let e = entry {
+            let t = now()
+            let fresh = e.creds.expiresAt.map { $0.timeIntervalSince(t) > skew } ?? true
+            if (fresh && !e.invalidated) || t.timeIntervalSince(e.loadedAt) < minReload {
+                lock.unlock(); return e.creds.token
+            }
+        }
+        lock.unlock()
+        let creds = try source()          // may block on a Keychain prompt; don't hold the lock
+        lock.lock(); entry = Entry(creds: creds, loadedAt: now()); lock.unlock()
+        return creds.token
+    }
+
+    public func invalidate() {
+        lock.lock(); entry?.invalidated = true; lock.unlock()
+    }
+}
 
 // Response shape (verified live 2026-11-07): top-level `five_hour` and `seven_day` are
 // {"utilization": <percent 0-100>, "resets_at": "2026-11-07T18:00:00.134955+00:00" | null, "limit_dollars": null, ...}
@@ -71,7 +121,9 @@ final class KeychainGate: @unchecked Sendable {
 
 public struct KeychainTokenProvider: TokenProviding {
     public init() {}
-    public func accessToken() throws -> String {
+    public func accessToken() throws -> String { try Self.credentials().token }
+
+    public static func credentials() throws -> TokenCredentials {
         guard KeychainGate.shared.tryEnter() else { throw LimitsError.keychainBusy }
         defer { KeychainGate.shared.leave() }
         let query: [String: Any] = [
@@ -83,7 +135,15 @@ public struct KeychainTokenProvider: TokenProviding {
         var out: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess, let data = out as? Data
         else { throw LimitsError.noToken }
-        return try Self.extractToken(from: data)
+        return try extractCredentials(from: data)
+    }
+    public static func extractCredentials(from data: Data) throws -> TokenCredentials {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oauth = obj["claudeAiOauth"] as? [String: Any],
+              let token = oauth["accessToken"] as? String, !token.isEmpty
+        else { throw LimitsError.noToken }
+        let exp = (oauth["expiresAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
+        return TokenCredentials(token: token, expiresAt: exp)
     }
     public static func extractToken(from data: Data) throws -> String {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -100,7 +160,7 @@ public struct OAuthLimitsClient: LimitsProviding {
     private let transport: Transport
     private let timeout: TimeInterval
 
-    public init(tokens: TokenProviding = KeychainTokenProvider(), transport: @escaping Transport = OAuthLimitsClient.live,
+    public init(tokens: TokenProviding = CachingTokenProvider(source: { try KeychainTokenProvider.credentials() }), transport: @escaping Transport = OAuthLimitsClient.live,
                 timeout: TimeInterval = 60) {
         self.tokens = tokens; self.transport = transport; self.timeout = timeout
     }
@@ -150,7 +210,7 @@ public struct OAuthLimitsClient: LimitsProviding {
         let (data, resp) = try await transport(req)
         switch resp.statusCode {
         case 200: return try LimitsDecoder.decode(data)
-        case 401, 403: throw LimitsError.unauthorized
+        case 401, 403: tokens.invalidate(); throw LimitsError.unauthorized
         default: throw LimitsError.http(resp.statusCode)
         }
     }
