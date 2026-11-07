@@ -50,8 +50,8 @@ jobs:
           body: |
             **Staraware** ⭐ — instead of paying, pay with a star on the repo.
 
-            Download the DMG, drag **Claude Usage** to Applications. The app is ad-hoc signed (not notarized): on first launch right-click > Open, or run `xattr -dr com.apple.quarantine "/Applications/Claude Usage.app"`.
-            Desktop widgets need a build signed with your own Apple Team ID (see README).
+            Download the DMG and drag **Claude Usage** to Applications.
+            This CI build is ad-hoc signed; the maintainer replaces it with a Developer ID signed, notarized DMG (`scripts/release-signed.sh`). If you get an unsigned build, right-click > Open on first launch.
           files: |
             dist/*.dmg
             dist/*.sha256

@@ -49,15 +49,10 @@ More:
 
 1. Go to the **[latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** and download `ClaudeUsage-<version>.dmg` (a `.sha256` checksum is next to it).
 2. Open the DMG and drag **Claude Usage** onto **Applications**.
-3. First launch: the app is ad-hoc signed and not notarized, so right-click it in Applications and choose **Open** (then **Open** again). Or run:
-
-   ```sh
-   xattr -dr com.apple.quarantine "/Applications/Claude Usage.app"
-   ```
+3. Launch it. Releases from 0.1.1 on are signed with a Developer ID and notarized by Apple, so it opens normally. (The older 0.1.0 was unsigned: right-click → **Open**.)
 4. macOS asks for access to the "Claude Code-credentials" Keychain item. Choose **Always Allow**.
 5. Look for the usage label in your menu bar. Click it to open the panel.
-
-Desktop widgets need a build signed with your own Apple Team ID, so build from source for those (below).
+6. For the desktop widgets: right-click the desktop → **Edit Widgets** → search "Claude Usage".
 
 ## Build from source
 
