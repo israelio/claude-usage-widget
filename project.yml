@@ -1,0 +1,67 @@
+name: ClaudeUsageWidget
+options:
+  bundleIdPrefix: com.ohad
+  deploymentTarget: { macOS: "14.0" }
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+packages:
+  UsageCore:
+    path: Packages/UsageCore
+targets:
+  ClaudeUsageWidget:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: UsageCore
+      - target: UsageWidgetExtension
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Claude Usage
+        LSUIElement: true
+        AppGroupID: $(APP_GROUP_ID)
+        NSUserNotificationsUsageDescription: Usage alerts for your Claude limits.
+    entitlements:
+      path: App/App.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP_ID)]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ohad.ClaudeUsageWidget
+        ENABLE_HARDENED_RUNTIME: YES
+        DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
+  UsageWidgetExtension:
+    type: app-extension
+    platform: macOS
+    sources: [Widget]
+    dependencies:
+      - package: UsageCore
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Claude Usage
+        AppGroupID: $(APP_GROUP_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widget/Widget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [$(APP_GROUP_ID)]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ohad.ClaudeUsageWidget.Widget
+        ENABLE_HARDENED_RUNTIME: YES
+        DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
+schemes:
+  ClaudeUsageWidget:
+    build: { targets: { ClaudeUsageWidget: all } }
+    run: { config: Debug }

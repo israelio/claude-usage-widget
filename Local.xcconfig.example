@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig. Find your Team ID at developer.apple.com > Membership.
+// On macOS 15+ the group id should be prefixed with the team id.
+DEVELOPMENT_TEAM = ABCDE12345
+APP_GROUP_ID = ABCDE12345.com.ohad.claudeusagewidget

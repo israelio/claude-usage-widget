@@ -1,0 +1,4 @@
+// Defaults. Override in Local.xcconfig (gitignored).
+APP_GROUP_ID = group.com.ohad.claudeusagewidget
+DEVELOPMENT_TEAM =
+#include? "Local.xcconfig"
