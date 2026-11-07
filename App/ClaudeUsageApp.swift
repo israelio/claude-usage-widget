@@ -10,7 +10,6 @@ struct ClaudeUsageApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var settings: AppSettings
     @StateObject private var service: UsageService
-    @State private var panel: FloatingPanel?
 
     init() {
         // Show native tooltips quickly (default is ~1.5s).
@@ -19,6 +18,7 @@ struct ClaudeUsageApp: App {
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
         Updater.shared.configure(settings: s)
+        PanelController.shared.configure(service: _service.wrappedValue, settings: s)
     }
 
     var body: some Scene {
@@ -36,21 +36,7 @@ struct ClaudeUsageApp: App {
     }
 
     private func syncPanel() {
-        if settings.prefs.floatingPanel {
-            if panel == nil {
-                panel = FloatingPanel(content: PopoverView(
-                    service: service,
-                    openHistory: { NotificationCenter.default.post(name: .openHistoryRequested, object: nil) },
-                    openSettings: {
-                        NSApp.activate(ignoringOtherApps: true)
-                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    }),
-                    onClose: { [settings] in Task { @MainActor in settings.prefs.floatingPanel = false } })
-            }
-            panel?.orderFrontRegardless()
-        } else {
-            panel?.orderOut(nil)
-        }
+        if settings.prefs.floatingPanel { PanelController.shared.show() } else { PanelController.shared.hide() }
     }
 }
 

@@ -155,6 +155,7 @@ struct UsageWidgetView: View {
             }
         }
         .containerBackground(.fill.tertiary, for: .widget)
+        .widgetURL(URL(string: "claudeusage://open"))   // tap opens the app's panel
     }
 }
 

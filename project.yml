@@ -32,6 +32,9 @@ targets:
         LSUIElement: true
         AppGroupID: $(APP_GROUP_ID)
         UpdateTeamID: $(DEVELOPMENT_TEAM)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.ohad.ClaudeUsageWidget
+            CFBundleURLSchemes: [claudeusage]
         NSUserNotificationsUsageDescription: Usage alerts for your Claude limits.
     entitlements:
       path: App/App.entitlements

@@ -9,6 +9,7 @@ final class FloatingPanel: NSPanel {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: PopoverView.preferredHeight),
                    styleMask: [.titled, .fullSizeContentView, .closable, .nonactivatingPanel],
                    backing: .buffered, defer: false)
+        isReleasedWhenClosed = false   // we keep and re-show the same panel
         isFloatingPanel = true
         level = .floating
         titleVisibility = .hidden
