@@ -106,7 +106,22 @@ public enum LimitsDecoder {
         if snap.sevenDay == nil { snap.sevenDay = weeklyAll }
         for (k, w) in legacy where snap.extra[k] == nil { snap.extra[k] = w }
         guard snap.fiveHour != nil || snap.sevenDay != nil else { throw LimitsError.badResponse }
+        snap.extraUsage = parseSpend(obj["spend"])
         return snap
+    }
+}
+
+extension LimitsDecoder {
+    static func parseSpend(_ value: Any?) -> ExtraUsage? {
+        guard let spend = value as? [String: Any],
+              let used = spend["used"] as? [String: Any],
+              let usedMinor = (used["amount_minor"] as? NSNumber)?.intValue else { return nil }
+        var limit: Int?
+        if let n = spend["limit"] as? NSNumber { limit = n.intValue }
+        else if let d = spend["limit"] as? [String: Any] { limit = (d["amount_minor"] as? NSNumber)?.intValue }
+        return ExtraUsage(enabled: (spend["enabled"] as? Bool) ?? false, usedMinor: usedMinor, limitMinor: limit,
+                          currency: (used["currency"] as? String) ?? "USD",
+                          exponent: (used["exponent"] as? NSNumber)?.intValue ?? 2)
     }
 }
 
@@ -154,7 +169,9 @@ public struct KeychainTokenProvider: TokenProviding {
     }
 }
 
-public struct OAuthLimitsClient: LimitsProviding {
+public protocol PlanProviding: Sendable { func fetchPlan() async throws -> PlanInfo }
+
+public struct OAuthLimitsClient: LimitsProviding, PlanProviding {
     public typealias Transport = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
     private let tokens: TokenProviding
     private let transport: Transport
@@ -171,17 +188,25 @@ public struct OAuthLimitsClient: LimitsProviding {
         return (data, http)
     }
 
-    /// Fetches limits, giving up with `LimitsError.timeout` after `timeout` seconds. The token read (which can
+    public func fetch() async throws -> LimitsSnapshot {
+        try await bounded { try await self.get("usage") { try LimitsDecoder.decode($0) } }
+    }
+
+    public func fetchPlan() async throws -> PlanInfo {
+        try await bounded { try await self.get("profile") { try ProfileDecoder.decode($0, now: Date()) } }
+    }
+
+    /// Runs `work`, giving up with `LimitsError.timeout` after `timeout` seconds. The token read (which can
     /// block on a Keychain permission dialog) runs on a global queue, and the race uses continuations so the
     /// timeout can return even while that blocking call is still pending.
-    public func fetch() async throws -> LimitsSnapshot {
+    private func bounded<T: Sendable>(_ work: @escaping @Sendable () async throws -> T) async throws -> T {
         let seconds = timeout
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<LimitsSnapshot, Error>) in
+        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
             let once = OnceGate()
-            let work = Task {
+            let job = Task {
                 do {
-                    let snap = try await self.fetchUnbounded()
-                    if once.claim() { cont.resume(returning: snap) }
+                    let v = try await work()
+                    if once.claim() { cont.resume(returning: v) }
                 } catch {
                     if once.claim() { cont.resume(throwing: error) }
                 }
@@ -191,25 +216,25 @@ public struct OAuthLimitsClient: LimitsProviding {
                 do { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) } catch { return }
                 if once.claim() { cont.resume(throwing: LimitsError.timeout) }
             }
-            once.onClaim { work.cancel(); timer.cancel() }
+            once.onClaim { job.cancel(); timer.cancel() }
         }
     }
 
-    private func fetchUnbounded() async throws -> LimitsSnapshot {
+    private func get<T>(_ endpoint: String, decode: (Data) throws -> T) async throws -> T {
         let tokens = self.tokens
         let token: String = try await withCheckedThrowingContinuation { cont in
             DispatchQueue.global(qos: .userInitiated).async {
                 cont.resume(with: Result { try tokens.accessToken() })
             }
         }
-        var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
+        var req = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/\(endpoint)")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.timeoutInterval = 15
         let (data, resp) = try await transport(req)
         switch resp.statusCode {
-        case 200: return try LimitsDecoder.decode(data)
+        case 200: return try decode(data)
         case 401, 403: tokens.invalidate(); throw LimitsError.unauthorized
         default: throw LimitsError.http(resp.statusCode)
         }

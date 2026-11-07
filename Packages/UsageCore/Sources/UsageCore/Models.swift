@@ -42,8 +42,10 @@ public struct LimitsSnapshot: Codable, Equatable, Sendable {
     /// Per-model weekly windows keyed by suffix of `seven_day_<name>` (e.g. "opus", "fable").
     public var extra: [String: LimitWindow]
     public var isEstimated: Bool
+    public var extraUsage: ExtraUsage?
     public init(fetchedAt: Date, fiveHour: LimitWindow? = nil, sevenDay: LimitWindow? = nil,
-                extra: [String: LimitWindow] = [:], isEstimated: Bool = false) {
+                extra: [String: LimitWindow] = [:], isEstimated: Bool = false, extraUsage: ExtraUsage? = nil) {
+        self.extraUsage = extraUsage
         self.fetchedAt = fetchedAt; self.fiveHour = fiveHour; self.sevenDay = sevenDay
         self.extra = extra; self.isEstimated = isEstimated
     }
