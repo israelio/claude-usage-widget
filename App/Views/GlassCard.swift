@@ -6,9 +6,10 @@ struct GlassCard<Content: View>: View {
     var trailing: AnyView? = nil
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compact) private var compact
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: compact ? 5 : 8) {
             if let title {
                 HStack {
                     if let icon { Image(systemName: icon).foregroundStyle(.secondary) }
@@ -19,7 +20,7 @@ struct GlassCard<Content: View>: View {
             }
             content
         }
-        .padding(12)
+        .padding(compact ? 8 : 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             ZStack {

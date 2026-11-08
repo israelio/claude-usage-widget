@@ -8,17 +8,18 @@ struct RaisedIconButton: View {
     var hoverTint: Color? = nil
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.compact) private var compact
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
-                if let title { Text(title) }
+                if let title { Text(title).lineLimit(1).fixedSize() }
             }
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(hovering ? (hoverTint ?? Color.white) : Color.white.opacity(0.80))
             .padding(.horizontal, title == nil ? 0 : 10)
-            .frame(minWidth: 32, minHeight: 28)
+            .frame(minWidth: compact ? 28 : 32, minHeight: compact ? 26 : 28)
         }
         .buttonStyle(RaisedButtonStyle(hovering: hovering, tint: hoverTint))
         .onHover { hovering = $0 }

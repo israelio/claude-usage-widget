@@ -52,7 +52,7 @@ final class PanelController {
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         let area = screen.visibleFrame
         var frame = panel.frame
-        frame.size.height = min(frame.size.height, area.height - 40)
+        frame.size.height = min(frame.size.height, ScreenMetrics.visibleHeight(area) - 40)
         frame.origin = NSPoint(x: area.midX - frame.width / 2, y: area.midY - frame.height / 2)
         panel.setFrame(frame, display: true)
     }
@@ -62,7 +62,7 @@ final class PanelController {
         let screen = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main ?? NSScreen.screens[0]
         let area = screen.visibleFrame
         var f = panel.frame
-        f.size.height = min(f.height, area.height - 20)
+        f.size.height = min(f.height, ScreenMetrics.visibleHeight(area) - 20)
         f.size.width = min(f.width, area.width - 20)
         f.origin.x = min(max(f.origin.x, area.minX), area.maxX - f.width)
         f.origin.y = min(max(f.origin.y, area.minY), area.maxY - f.height)
@@ -76,7 +76,7 @@ final class PanelController {
         guard let panel else { return }
         let titleBar = panel.frame.height - panel.contentLayoutRect.height
         let area = (panel.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
-        let target = min(contentHeight + titleBar, area.height - 20)
+        let target = min(contentHeight + titleBar, ScreenMetrics.visibleHeight(area) - 20)
         guard abs(target - panel.frame.height) > 1 else { return }
         var f = panel.frame
         f.origin.y += f.height - target

@@ -3,6 +3,7 @@ import Charts
 import UsageCore
 
 struct DailyCard: View {
+    @Environment(\.compact) private var compact
     @ObservedObject var service: UsageService
     @State private var range = 7
     @State private var selected: Date?
@@ -52,8 +53,8 @@ struct DailyCard: View {
                 }
             }
             .chartXSelection(value: $selected)
-            .chartYAxis { AxisMarks { v in AxisValueLabel { Text(axisLabel(v.as(Double.self) ?? 0)).font(.system(size: 9)) } } }
-            .frame(height: 90)
+            .chartYAxis { AxisMarks(values: .automatic(desiredCount: compact ? 2 : 4)) { v in AxisValueLabel { Text(axisLabel(v.as(Double.self) ?? 0)).font(.system(size: 9)) } } }
+            .frame(height: compact ? 56 : 90)
             .padding(.top, 4)
         }
     }

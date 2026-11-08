@@ -5,25 +5,37 @@ struct PlanCard: View {
     let plan: PlanInfo
     let extraUsage: ExtraUsage?
 
+    @Environment(\.compact) private var compact
+
     var body: some View {
         GlassCard(title: "Plan", icon: "creditcard") {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: compact ? 3 : 5) {
                 HStack {
                     Text(plan.planName).fontWeight(.semibold)
                     Spacer()
                     Text(plan.status).foregroundStyle(plan.status == "Active" ? Color.green : Color.orange)
                 }
-                if let r = plan.nextRenewal {
+                if compact {
                     HStack {
-                        Text("Renews ≈ \(Self.day.string(from: r)) · \(Self.relative(r))").foregroundStyle(.secondary)
+                        if let r = plan.nextRenewal {
+                            Text("Renews ≈ \(Self.day.string(from: r)) · \(Self.relative(r))").foregroundStyle(.secondary).help(helpText)
+                        }
                         Spacer()
+                        Text("Extra \(extraText)").foregroundStyle(.secondary)
                     }
-                    .help(helpText)
-                }
-                HStack {
-                    Text("Extra usage").foregroundStyle(.secondary)
-                    Spacer()
-                    Text(extraText)
+                } else {
+                    if let r = plan.nextRenewal {
+                        HStack {
+                            Text("Renews ≈ \(Self.day.string(from: r)) · \(Self.relative(r))").foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .help(helpText)
+                    }
+                    HStack {
+                        Text("Extra usage").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(extraText)
+                    }
                 }
             }
             .font(.system(size: 12))
