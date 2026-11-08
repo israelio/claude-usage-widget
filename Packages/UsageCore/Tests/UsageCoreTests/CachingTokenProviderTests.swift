@@ -74,3 +74,30 @@ final class CachingTokenProviderTests: XCTestCase {
         XCTAssertEqual(t.invalidated, 1)
     }
 }
+
+final class SecurityToolReaderTests: XCTestCase {
+    let json = #"{"claudeAiOauth":{"accessToken":"tokCLI","expiresAt":1800000000000}}"#
+
+    func testParsesCredentialsFromCommandOutput() throws {
+        let c = try KeychainTokenProvider.credentialsViaCommand(executable: "/bin/echo", arguments: [json], timeout: 5)
+        XCTAssertEqual(c.token, "tokCLI")
+        XCTAssertEqual(c.expiresAt, Date(timeIntervalSince1970: 1_800_000_000))
+    }
+    func testNonZeroExitIsNoToken() {
+        XCTAssertThrowsError(try KeychainTokenProvider.credentialsViaCommand(executable: "/usr/bin/false", arguments: [], timeout: 5)) {
+            XCTAssertEqual($0 as? LimitsError, .noToken)
+        }
+    }
+    func testGarbageOutputIsNoToken() {
+        XCTAssertThrowsError(try KeychainTokenProvider.credentialsViaCommand(executable: "/bin/echo", arguments: ["not json"], timeout: 5)) {
+            XCTAssertEqual($0 as? LimitsError, .noToken)
+        }
+    }
+    func testHangingCommandTimesOut() {
+        let start = Date()
+        XCTAssertThrowsError(try KeychainTokenProvider.credentialsViaCommand(executable: "/bin/sleep", arguments: ["5"], timeout: 0.4)) {
+            XCTAssertEqual($0 as? LimitsError, .timeout)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 3)
+    }
+}

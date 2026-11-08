@@ -79,7 +79,7 @@ More:
 1. Go to the **[latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** and download `ClaudeUsage-<version>.dmg` (a `.sha256` checksum is next to it).
 2. Open the DMG and drag **Claude Usage** onto **Applications**.
 3. Launch it. Releases from 0.1.1 on are signed with a Developer ID and notarized by Apple, so it opens normally. (The older 0.1.0 was unsigned: right-click → **Open**.)
-4. On first launch macOS asks for access to the "Claude Code-credentials" Keychain item. Enter your login password and choose **Always Allow** ([why?](#why-does-it-ask-for-keychain-access)).
+4. The app reads your Claude Code login from the Keychain through Apple's `security` tool, normally without a prompt. If macOS does ask, choose **Always Allow** ([details](#keychain-access)).
 5. Look for the usage label in your menu bar. Click it to open the panel.
 6. For the desktop widgets: right-click the desktop → **Edit Widgets** → search "Claude Usage".
 
@@ -87,19 +87,14 @@ More:
 
 The app checks GitHub Releases every 6 hours. When a newer version exists it downloads the DMG, verifies the SHA-256 checksum and that the new app is notarized and signed by the same Developer ID team, then replaces itself and restarts. Turn this off under Settings > Updates ("Install updates automatically"); you will then get a notification instead. You can also use "Check for updates" in the About popover. Builds without a team ID (unsigned or development builds) only notify and link to the release page.
 
-## Why does it ask for Keychain access?
+## Keychain access
 
-On first launch macOS shows: *"Claude Usage wants to use your confidential information stored in 'Claude Code-credentials' in your keychain."* This is expected.
+Claude Code keeps your login (an OAuth token) in your macOS Keychain under the name "Claude Code-credentials". Your 5-hour and weekly limit percentages are only available from Anthropic's servers, and the app needs that same token to ask for them.
 
-- **What it is:** when you sign in to Claude Code, it saves your login (an OAuth token) in your macOS Keychain under that name. Your 5-hour and weekly limit percentages are only available from Anthropic's servers, and the app needs that same token to ask for them.
-- **Why it has to ask:** that Keychain item belongs to Claude Code, not to this app. macOS lets an app read another app's item only if you approve it, and that is the prompt. Nothing in the app can skip it.
-- **What the app does with it:**
-  - It reads the token once per launch, keeps it in memory only, and uses it for a single call to Anthropic's usage endpoint (`api.anthropic.com`).
-  - It never writes the token to disk, logs it, or sends it anywhere else.
-  - It does not change or delete anything in your Keychain.
-- **Choose "Always Allow".** Plain "Allow" is valid for just one read, so you would be asked again. Always Allow adds the app to the item's trusted list, so later launches and updates of the signed release do not ask again.
-- **When you may be asked again:** if Claude Code refreshes its login it rewrites the Keychain item, which resets the trusted list. Running an unsigned or Xcode-built copy also counts as a different app.
-- **If you click Deny:** the app still works. It shows token counts and cost from your local logs and an *estimated* usage percentage, but not the real limits.
+- **No password prompt in normal use.** The app reads the token through Apple's built-in `security` command-line tool, which that Keychain item already trusts (Claude Code writes the item with the same tool). It reads the token once per launch, keeps it in memory only, and re-reads only when the token is close to expiring or was rejected.
+- **If macOS still asks** (for example on a Mac where the tool isn't trusted by the item), the dialog reads *"Claude Usage wants to access key 'Claude Code-credentials'"*. Enter your login password and choose **Always Allow**. Plain "Allow" is valid for one read only. Claude Code resets the item's trusted list whenever it refreshes its login, so that prompt can come back after a refresh.
+- **What the app does with the token:** it uses it for calls to Anthropic's usage and account endpoints (`api.anthropic.com`) and nothing else. It never writes the token to disk, logs it, or changes anything in your Keychain.
+- **If access is denied:** the app still works with token counts and cost from your local logs and an *estimated* usage percentage, but not the real limits.
 
 ## Build from source
 
@@ -156,7 +151,7 @@ swift test --package-path Packages/UsageCore
 
 - **Costs are API-equivalent estimates**, not what a subscription plan bills. Check the default prices in Settings; they may lag current Anthropic pricing.
 - The usage endpoint is **undocumented** and may change. That is why the local fallback exists.
-- The login token is only read from the Keychain, kept in memory and sent to Anthropic's API; it is never logged or written to disk. See [Why does it ask for Keychain access?](#why-does-it-ask-for-keychain-access).
+- The login token is only read from the Keychain, kept in memory and sent to Anthropic's API; it is never logged or written to disk. See [Keychain access](#keychain-access).
 
 ## License
 

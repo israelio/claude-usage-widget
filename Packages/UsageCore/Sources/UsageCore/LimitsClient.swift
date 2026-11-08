@@ -138,9 +138,19 @@ public struct KeychainTokenProvider: TokenProviding {
     public init() {}
     public func accessToken() throws -> String { try Self.credentials().token }
 
+    /// Reads Claude Code's login. The Keychain item is owned by Claude Code, so a direct read from this app triggers a
+    /// password prompt, and Claude Code resets the item's trusted-app list whenever it refreshes its login, which makes
+    /// "Always Allow" short-lived. Apple's `security` tool is already trusted by that item (Claude Code writes it with
+    /// that tool), so reading through it never prompts. The direct read is only a fallback.
     public static func credentials() throws -> TokenCredentials {
         guard KeychainGate.shared.tryEnter() else { throw LimitsError.keychainBusy }
         defer { KeychainGate.shared.leave() }
+        if let c = try? credentialsViaCommand(executable: "/usr/bin/security",
+                                              arguments: ["find-generic-password", "-s", "Claude Code-credentials", "-w"], timeout: 10) {
+            return c
+        }
+        // Test/diagnostic switch: never fall back to the direct (prompting) read.
+        if ProcessInfo.processInfo.environment["CLAUDEUSAGE_KEYCHAIN_MODE"] == "tool-only" { throw LimitsError.noToken }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "Claude Code-credentials",
@@ -152,6 +162,32 @@ public struct KeychainTokenProvider: TokenProviding {
         else { throw LimitsError.noToken }
         return try extractCredentials(from: data)
     }
+
+    /// Runs a command that prints the credentials JSON and parses it. Arguments go straight to the process (no shell).
+    static func credentialsViaCommand(executable: String, arguments: [String], timeout: TimeInterval) throws -> TokenCredentials {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: executable)
+        p.arguments = arguments
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        p.standardInput = FileHandle.nullDevice
+        let done = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in done.signal() }
+        do { try p.run() } catch { throw LimitsError.noToken }
+        var data = Data()
+        let reader = DispatchQueue(label: "claudeusage.keychain.read")
+        let readDone = DispatchSemaphore(value: 0)
+        reader.async { data = out.fileHandleForReading.readDataToEndOfFile(); readDone.signal() }
+        if done.wait(timeout: .now() + timeout) == .timedOut {
+            p.terminate()
+            throw LimitsError.timeout
+        }
+        _ = readDone.wait(timeout: .now() + 2)
+        guard p.terminationStatus == 0 else { throw LimitsError.noToken }
+        return try extractCredentials(from: data)
+    }
+
     public static func extractCredentials(from data: Data) throws -> TokenCredentials {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let oauth = obj["claudeAiOauth"] as? [String: Any],
