@@ -25,6 +25,14 @@ struct PopoverView: View {
     @State private var footerH: CGFloat = 0
     @Environment(\.colorScheme) private var scheme
 
+    /// The menu bar popover is as tall as its content (up to `panelHeight`, the screen limit), so there is no empty gap
+    /// above the pinned footer; the floating panel (panelHeight == nil) is sized by its window instead.
+    private var effectiveHeight: CGFloat? {
+        guard let cap = panelHeight else { return nil }
+        let total = contentH + footerH
+        return total > 0 ? min(total, cap) : cap
+    }
+
     var body: some View {
         let compact = Self.isCompact(for: NSScreen.main)
         VStack(spacing: 0) {
@@ -76,7 +84,7 @@ struct PopoverView: View {
         .onPreferenceChange(PopoverContentHeightKey.self) { h in contentH = h; onContentHeight?(h + footerH) }
         .onPreferenceChange(PopoverFooterHeightKey.self) { h in footerH = h; onContentHeight?(contentH + h) }
         .environment(\.compact, compact)
-        .frame(width: 360, height: panelHeight)
+        .frame(width: 360, height: effectiveHeight)
         .background(
             ZStack {
                 Rectangle().fill(.regularMaterial)
