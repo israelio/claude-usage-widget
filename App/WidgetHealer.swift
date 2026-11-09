@@ -23,12 +23,28 @@ enum WidgetHealer {
             .appendingPathComponent("Contents/PlugIns/UsageWidgetExtension.appex/Contents/MacOS/UsageWidgetExtension").path
         let stale = await Task.detached { staleProcesses(executable: exe) }.value
         if !stale.isEmpty {
-            await Task.detached {
-                for pid in stale { _ = run("/bin/kill", [String(pid)]) }
-                _ = run("/usr/bin/killall", ["chronod"])   // user-level agent; launchd restarts it
-            }.value
-            try? await Task.sleep(for: .seconds(3))
+            await restart(pids: stale)
+        } else {
+            WidgetCenter.shared.reloadAllTimelines()
         }
+    }
+
+    /// Kills every running widget extension process and chronod, then reloads once they're back.
+    static func forceRestart() async {
+        let exe = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/PlugIns/UsageWidgetExtension.appex/Contents/MacOS/UsageWidgetExtension").path
+        let pids = await Task.detached {
+            run("/bin/ps", ["-axo", "pid=,etime=,command="]).map { WidgetHealth.matchingProcesses(psOutput: $0, executable: exe).map { $0.pid } } ?? []
+        }.value
+        await restart(pids: pids)
+    }
+
+    private static func restart(pids: [Int32]) async {
+        await Task.detached {
+            for pid in pids { _ = run("/bin/kill", [String(pid)]) }
+            _ = run("/usr/bin/killall", ["chronod"])   // user-level agent; launchd restarts it
+        }.value
+        try? await Task.sleep(for: .seconds(3))
         WidgetCenter.shared.reloadAllTimelines()
     }
 

@@ -45,11 +45,18 @@ struct Provider: AppIntentTimelineProvider {
         guard let url = SharedSnapshot.groupURL(groupID: id) else { return nil }
         return SharedSnapshot.load(from: url)
     }
+    /// Stamped on every system request so the app can tell the widgets are still being served.
+    private func beat() {
+        let id = Bundle.main.object(forInfoDictionaryKey: "AppGroupID") as? String ?? ""
+        if let url = WidgetHeartbeat.url(groupID: id) { WidgetHeartbeat.write(to: url) }
+    }
     func placeholder(in context: Context) -> UsageEntry { UsageEntry(date: Date(), snapshot: load()) }
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> UsageEntry {
-        UsageEntry(date: Date(), snapshot: load(), configuration: configuration)
+        beat()
+        return UsageEntry(date: Date(), snapshot: load(), configuration: configuration)
     }
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<UsageEntry> {
+        beat()
         let entry = UsageEntry(date: Date(), snapshot: load(), configuration: configuration)
         return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(15 * 60)))
     }
@@ -202,6 +209,7 @@ struct UsageWidgetView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .unredacted()   // if the system falls back to the placeholder, still show the last known numbers
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(URL(string: "claudeusage://open"))   // tap opens the app's panel
     }

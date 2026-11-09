@@ -32,6 +32,9 @@ final class UsageService: ObservableObject {
     private static let wakeDelays: [Double] = [3, 7, 20, 30, 60]   // cumulative +3s, +10s, +30s, +60s, +120s
     private static let lockedRetrySeconds = 60.0
     private var lastWritten: SharedSnapshot?
+    private var lastReload: Date?
+    /// WidgetKit budgets reloads per day; the widget's own 15-minute timeline covers the baseline.
+    private static let reloadInterval: TimeInterval = 15 * 60
     /// False when the App Group container isn't provisioned (unsigned build): widgets can't see our data.
     let groupAvailable: Bool
     private static let minPoll = 30
@@ -163,7 +166,7 @@ final class UsageService: ObservableObject {
 
         limits = snap; summary = sum; history = hist2
         writeSnapshot(snap, sum, hist2, now2)
-        if fetched, !snap.isEstimated { WidgetCenter.shared.reloadAllTimelines() }   // keeps the widget's "Updated" time current
+        if fetched, !snap.isEstimated { await WidgetWatchdogRunner.check(groupID: groupID) }
     }
 
     /// Silent on failure: keeps the previous plan and retries on a later successful poll.
@@ -185,10 +188,12 @@ final class UsageService: ObservableObject {
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("ClaudeUsageWidget/snapshot.json")
         try? snap.save(to: url)
-        // Reload timelines only when the content (ignoring the timestamp) actually changed.
-        var cmp = snap; cmp.updatedAt = .distantPast
-        var last = lastWritten; last?.updatedAt = .distantPast
+        // Reload timelines only when what's displayed changed, or at most every 15 minutes otherwise.
+        let changed = !(lastWritten?.displayEquals(snap) ?? false)
         lastWritten = snap
-        if cmp != last { WidgetCenter.shared.reloadAllTimelines() }
+        if changed || lastReload.map({ now.timeIntervalSince($0) >= Self.reloadInterval }) ?? true {
+            lastReload = now
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 }
