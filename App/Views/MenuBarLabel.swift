@@ -17,28 +17,30 @@ struct MenuBarLabel: View {
     private func text(weekly: Bool, delta: Bool) -> String {
         guard let l = service.limits, let five = l.fiveHour else { return "…" }
         let dot = five.utilization >= 85 ? "🔴" : five.utilization >= 60 ? "🟠" : "🟢"
-        var s = "\(dot) \(Int(five.utilization.rounded()))%"
+        let left = settings.prefs.showRemaining
+        var s = "\(dot) \(Format.displayPercent(used: five.utilization, showRemaining: left))%\(left ? " left" : "")"
         if delta, let p = Pace.compute(window: five, length: Pace.fiveHours, now: Date()) {
             let d = Int(p.delta.rounded()); s += " \(d >= 0 ? "▲" : "▼")\(abs(d))%"
         }
-        if weekly, let w = l.sevenDay { s += " · \(Int(w.utilization.rounded()))%" }
+        if weekly, let w = l.sevenDay { s += " · \(Format.displayPercent(used: w.utilization, showRemaining: left))%" }
         return s
     }
 }
 
 extension MenuBarLabel {
     /// Short hover text that explains exactly the numbers shown in the menu bar label.
-    static func tooltip(for l: LimitsSnapshot?, mode: MenuBarMode, now: Date = Date()) -> String {
+    static func tooltip(for l: LimitsSnapshot?, mode: MenuBarMode, showRemaining: Bool = false, now: Date = Date()) -> String {
         guard let l, let five = l.fiveHour else { return "Claude Usage — loading…" }
         let suffix = l.isEstimated ? " (estimated)" : ""
-        var lines = ["\(Int(five.utilization.rounded()))% — 5-hour session used\(suffix)"]
+        let word = showRemaining ? "left" : "used"
+        var lines = ["\(Format.displayPercent(used: five.utilization, showRemaining: showRemaining))% — 5-hour session \(word)\(suffix)"]
         guard mode != .iconOnly else { return lines[0] }
         if mode == .sessionWeekly {
             if let p = Pace.compute(window: five, length: Pace.fiveHours, now: now) {
                 let d = Int(p.delta.rounded())
                 lines.append("\(d >= 0 ? "▲" : "▼")\(abs(d))% — \(d >= 0 ? "above" : "below") an even pace (\(d >= 0 ? "faster" : "slower") than average use)")
             }
-            if let w = l.sevenDay { lines.append("\(Int(w.utilization.rounded()))% — weekly limit used") }
+            if let w = l.sevenDay { lines.append("\(Format.displayPercent(used: w.utilization, showRemaining: showRemaining))% — weekly limit \(word)") }
         }
         return lines.joined(separator: "\n")
     }

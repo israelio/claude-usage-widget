@@ -6,8 +6,10 @@ public struct SharedSnapshot: Codable, Equatable, Sendable {
     public var last7: Totals
     public var daily: [DailyPoint]
     public var updatedAt: Date
-    public init(limits: LimitsSnapshot?, today: Totals, last7: Totals, daily: [DailyPoint], updatedAt: Date) {
-        self.limits = limits; self.today = today; self.last7 = last7; self.daily = daily; self.updatedAt = updatedAt
+    /// App preference: show remaining instead of used. Optional so older snapshot files still decode.
+    public var showRemaining: Bool?
+    public init(limits: LimitsSnapshot?, today: Totals, last7: Totals, daily: [DailyPoint], updatedAt: Date, showRemaining: Bool? = nil) {
+        self.showRemaining = showRemaining; self.limits = limits; self.today = today; self.last7 = last7; self.daily = daily; self.updatedAt = updatedAt
     }
 
     public func save(to url: URL) throws {

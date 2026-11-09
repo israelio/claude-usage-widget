@@ -12,6 +12,10 @@ struct SettingsView: View {
                 Picker("Menu bar", selection: $settings.prefs.menuBarMode) {
                     ForEach(MenuBarMode.allCases) { Text($0.rawValue).tag($0) }
                 }
+                Picker("Show usage as", selection: $settings.prefs.showRemaining) {
+                    Text("Used").tag(false)
+                    Text("Left").tag(true)
+                }
                 Toggle("Floating always-on-top panel", isOn: $settings.prefs.floatingPanel)
                 Stepper("Refresh every \(settings.prefs.pollSeconds)s", value: $settings.prefs.pollSeconds, in: 30...600, step: 30)
             }

@@ -179,7 +179,8 @@ final class UsageService: ObservableObject {
 
     private func writeSnapshot(_ l: LimitsSnapshot, _ s: UsageSummary, _ h: HistoryData, _ now: Date) {
         let snap = SharedSnapshot(limits: l, today: s.today, last7: s.last7,
-                                  daily: Aggregator.daily(h, prices: settings.prefs.prices, days: 7, now: now), updatedAt: now)
+                                  daily: Aggregator.daily(h, prices: settings.prefs.prices, days: 7, now: now), updatedAt: now,
+                                  showRemaining: settings.prefs.showRemaining)
         let url = SharedSnapshot.groupURL(groupID: groupID)
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("ClaudeUsageWidget/snapshot.json")

@@ -50,6 +50,7 @@ Top to bottom, the panel shows its title and version, then:
 - **Token Usage** — input, output and cache tokens plus cost for Today, Last 7 Days, This Month and Last 30 Days, then each model's share of your last 30 days of spend. Costs are API-equivalent estimates from an editable price table, not your subscription bill.
 - **Plan** — your plan (for example Max 5x) and subscription status, the estimated renewal date, and extra-usage spend if you have it enabled. Anthropic doesn't expose the renewal date, so it is estimated as the next monthly anniversary of your subscription start; annual plans renew on a different schedule.
 - **Next refresh** — countdown to the next poll. If the live endpoint is unreachable it shows "updated Xm ago" or an "estimated" badge instead.
+- **Used or left** — show usage as percent used or percent remaining (`98% left`) in the menu bar and the widgets: Settings → Display → *Show usage as*, or per widget via right-click → *Edit Widget* (*Same as app setting* / *Used* / *Left*). The small widget can also show either the 5-hour session or the weekly limit. Colours always follow how much you have used.
 - **Footer** — open Claude's usage page, refresh now, open the 90-day History window, Settings, About, and Quit.
 
 More:

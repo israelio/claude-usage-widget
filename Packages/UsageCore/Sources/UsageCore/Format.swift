@@ -1,6 +1,11 @@
 import Foundation
 
 public enum Format {
+    /// The number to display for a utilization percent: used, or 100 - used (clamped 0...100) when showing what's left.
+    public static func displayPercent(used: Double, showRemaining: Bool) -> Int {
+        let v = showRemaining ? 100 - used : used
+        return Int(min(100, max(0, v)).rounded())
+    }
     public static func tokens(_ n: Int) -> String {
         let d = Double(n)
         switch n {
