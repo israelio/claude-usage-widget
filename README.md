@@ -55,7 +55,7 @@ Top to bottom, the panel shows its title and version, then:
 
 More:
 
-- **Menu bar** — a compact label such as `🟢 42% ▼7% · 71%` (colour shows how close you are to the limit). Choose session %, session + weekly, or icon only in Settings.
+- **Menu bar** — a compact label such as `🟢 42% ▼7% · 71%` (colour shows how close you are to the limit). Choose session %, session + weekly, or icon only in Settings, or pick exactly what to show (status dot, session, pace, weekly, per-model weekly such as Fable, today's cost, session reset countdown) under Settings → Display → Menu bar → Custom….
 - **Floating panel** — turn on *Floating always-on-top panel* in Settings to pin the same view on your desktop. It remembers its position.
 - **90-day history** — a daily chart you can switch between cost and tokens, last-30-day model breakdown, totals, and **Export CSV**.
 - **Smart notifications**

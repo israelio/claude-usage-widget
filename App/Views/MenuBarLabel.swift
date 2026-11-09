@@ -7,42 +7,23 @@ struct MenuBarLabel: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        switch settings.prefs.menuBarMode {
-        case .iconOnly: Image(systemName: "gauge.with.dots.needle.50percent")
-        case .percent: Text(text(weekly: false, delta: false))
-        case .sessionWeekly: Text(text(weekly: true, delta: true))
+        if settings.prefs.menuBarMode == .iconOnly {
+            Image(systemName: "gauge.with.dots.needle.50percent")
+        } else {
+            let t = MenuBarText.make(limits: service.limits, todayCost: service.summary.today.cost,
+                                     items: settings.prefs.effectiveMenuBarItems,
+                                     showRemaining: settings.prefs.showRemaining, now: Date())
+            // Keep a visible item in the bar even if every toggle is off.
+            if t.isEmpty { Image(systemName: "gauge.with.dots.needle.50percent") } else { Text(t) }
         }
-    }
-
-    private func text(weekly: Bool, delta: Bool) -> String {
-        guard let l = service.limits, let five = l.fiveHour else { return "…" }
-        let dot = five.utilization >= 85 ? "🔴" : five.utilization >= 60 ? "🟠" : "🟢"
-        let left = settings.prefs.showRemaining
-        var s = "\(dot) \(Format.displayPercent(used: five.utilization, showRemaining: left))%\(left ? " left" : "")"
-        if delta, let p = Pace.compute(window: five, length: Pace.fiveHours, now: Date()) {
-            let d = Int(p.delta.rounded()); s += " \(d >= 0 ? "▲" : "▼")\(abs(d))%"
-        }
-        if weekly, let w = l.sevenDay { s += " · \(Format.displayPercent(used: w.utilization, showRemaining: left))%" }
-        return s
     }
 }
 
 extension MenuBarLabel {
-    /// Short hover text that explains exactly the numbers shown in the menu bar label.
-    static func tooltip(for l: LimitsSnapshot?, mode: MenuBarMode, showRemaining: Bool = false, now: Date = Date()) -> String {
-        guard let l, let five = l.fiveHour else { return "Claude Usage — loading…" }
-        let suffix = l.isEstimated ? " (estimated)" : ""
-        let word = showRemaining ? "left" : "used"
-        var lines = ["\(Format.displayPercent(used: five.utilization, showRemaining: showRemaining))% — 5-hour session \(word)\(suffix)"]
-        guard mode != .iconOnly else { return lines[0] }
-        if mode == .sessionWeekly {
-            if let p = Pace.compute(window: five, length: Pace.fiveHours, now: now) {
-                let d = Int(p.delta.rounded())
-                lines.append("\(d >= 0 ? "▲" : "▼")\(abs(d))% — \(d >= 0 ? "above" : "below") an even pace (\(d >= 0 ? "faster" : "slower") than average use)")
-            }
-            if let w = l.sevenDay { lines.append("\(Format.displayPercent(used: w.utilization, showRemaining: showRemaining))% — weekly limit \(word)") }
-        }
-        return lines.joined(separator: "\n")
+    /// Short hover text that explains exactly the items shown in the menu bar label.
+    static func tooltip(service: UsageService, prefs: Prefs, now: Date = Date()) -> String {
+        MenuBarText.tooltip(limits: service.limits, todayCost: service.summary.today.cost,
+                            items: prefs.effectiveMenuBarItems, showRemaining: prefs.showRemaining, now: now)
     }
 }
 

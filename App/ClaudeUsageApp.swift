@@ -59,7 +59,7 @@ private struct LabelHost: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        let tip = MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode, showRemaining: settings.prefs.showRemaining)
+        let tip = MenuBarLabel.tooltip(service: service, prefs: settings.prefs)
         MenuBarLabel(service: service, settings: settings)
             .help(tip)
             .onChange(of: tip) { _, t in StatusItemTooltip.apply(t) }
@@ -67,6 +67,9 @@ private struct LabelHost: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
             }
             .onChange(of: settings.prefs.menuBarMode) { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
+            }
+            .onChange(of: settings.prefs.menuBarItems) { _, _ in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
             }
             .task {
@@ -80,7 +83,7 @@ private struct LabelHost: View {
                     HistoryWindowController.shared.show(attachTo: args.contains("--show-history") ? PanelController.shared.visiblePanel : nil)
                 }
                 try? await Task.sleep(nanoseconds: 800_000_000)
-                StatusItemTooltip.apply(MenuBarLabel.tooltip(for: service.limits, mode: settings.prefs.menuBarMode, showRemaining: settings.prefs.showRemaining))
+                StatusItemTooltip.apply(MenuBarLabel.tooltip(service: service, prefs: settings.prefs))
             }
     }
 }
