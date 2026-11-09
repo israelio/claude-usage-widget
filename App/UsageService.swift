@@ -27,6 +27,10 @@ final class UsageService: ObservableObject {
     private var isRefreshing = false
     private var lastFetchSuccess: Date?
     private var failures = 0
+    private var wakeRetry: Task<Void, Never>?
+    private var lockedRetry: Task<Void, Never>?
+    private static let wakeDelays: [Double] = [3, 7, 20, 30, 60]   // cumulative +3s, +10s, +30s, +60s, +120s
+    private static let lockedRetrySeconds = 60.0
     private var lastWritten: SharedSnapshot?
     /// False when the App Group container isn't provisioned (unsigned build): widgets can't see our data.
     let groupAvailable: Bool
@@ -51,7 +55,8 @@ final class UsageService: ObservableObject {
     func start() {
         guard loop == nil else { return }
         Notifier.requestAuthorization()
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.refreshNow() } }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.retryAfterWake() } }
+        WidgetHealer.run()
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -70,9 +75,38 @@ final class UsageService: ObservableObject {
         return min(max(base, Self.maxBackoff), base << min(failures, 10))
     }
 
+    /// User-initiated refresh (button): may show a Keychain dialog if needed.
     func refreshNow() {
         guard !isRefreshing else { return }
-        Task { await refresh() }
+        Task {
+            KeychainTokenProvider.allowUserInteraction = true
+            await refresh()
+            KeychainTokenProvider.allowUserInteraction = false
+        }
+    }
+
+    /// The network usually isn't up right after wake, so retry with growing delays until a fetch succeeds.
+    private func retryAfterWake() {
+        wakeRetry?.cancel()
+        wakeRetry = Task { [weak self] in
+            for delay in Self.wakeDelays {
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled, let self else { return }
+                await self.refresh()
+                if self.error == nil, self.limits?.isEstimated == false { break }
+            }
+            self?.failures = 0
+        }
+    }
+
+    /// Locked keychain: keep the last data and quietly retry in a minute instead of backing off.
+    private func scheduleLockedRetry() {
+        lockedRetry?.cancel()
+        lockedRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.lockedRetrySeconds))
+            guard !Task.isCancelled else { return }
+            await self?.refresh()
+        }
     }
 
     func refresh() async {
@@ -107,7 +141,7 @@ final class UsageService: ObservableObject {
                 await ingestor.record(snap)
             } catch {
                 self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                failures += 1
+                if (error as? LimitsError) == .keychainLocked { scheduleLockedRetry() } else { failures += 1 }
                 // Keep the last real snapshot (now stale); only fall back to the estimate if there is none.
                 if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
             }
@@ -129,6 +163,7 @@ final class UsageService: ObservableObject {
 
         limits = snap; summary = sum; history = hist2
         writeSnapshot(snap, sum, hist2, now2)
+        if fetched, !snap.isEstimated { WidgetCenter.shared.reloadAllTimelines() }   // keeps the widget's "Updated" time current
     }
 
     /// Silent on failure: keeps the previous plan and retries on a later successful poll.

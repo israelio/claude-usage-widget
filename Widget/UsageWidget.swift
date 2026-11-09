@@ -14,7 +14,7 @@ struct Provider: TimelineProvider {
         guard let url = SharedSnapshot.groupURL(groupID: id) else { return nil }
         return SharedSnapshot.load(from: url)
     }
-    func placeholder(in context: Context) -> UsageEntry { UsageEntry(date: Date(), snapshot: nil) }
+    func placeholder(in context: Context) -> UsageEntry { UsageEntry(date: Date(), snapshot: load()) }
     func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void) {
         completion(UsageEntry(date: Date(), snapshot: load()))
     }
@@ -26,9 +26,14 @@ struct Provider: TimelineProvider {
 
 private struct FreshnessCaption: View {
     let snapshot: SharedSnapshot
+    let now: Date
+    private static let staleAfter: TimeInterval = 30 * 60
     var body: some View {
+        let time = snapshot.updatedAt.formatted(date: .omitted, time: .shortened)
         if snapshot.limits?.isEstimated == true {
             Text("estimated").font(.system(size: 10)).foregroundStyle(.orange)
+        } else if now.timeIntervalSince(snapshot.updatedAt) > Self.staleAfter {
+            Text("Stale · updated \(time)").font(.system(size: 10)).foregroundStyle(.orange)
         } else {
             Text("Updated \(snapshot.updatedAt.formatted(date: .omitted, time: .shortened))")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
@@ -122,7 +127,7 @@ struct UsageWidgetView: View {
                         Text("5h session").font(.caption2).foregroundStyle(.secondary)
                         Ring(value: l.fiveHour?.utilization ?? 0).frame(width: 78, height: 78)
                         Text("Week \(Int((l.sevenDay?.utilization ?? 0).rounded()))%").font(.caption2.bold())
-                        FreshnessCaption(snapshot: s)
+                        FreshnessCaption(snapshot: s, now: entry.date)
                     }
                 case .systemMedium:
                     VStack(alignment: .leading, spacing: 10) {
@@ -130,7 +135,7 @@ struct UsageWidgetView: View {
                         Bar(title: "Weekly Limit", window: l.sevenDay, length: Pace.week, now: entry.date)
                         Text("Today \(Format.cost(s.today.cost)) · \(Format.tokens(s.today.tokens.total)) tokens")
                             .font(.caption2).foregroundStyle(.secondary)
-                        FreshnessCaption(snapshot: s)
+                        FreshnessCaption(snapshot: s, now: entry.date)
                     }
                 default:
                     VStack(alignment: .leading, spacing: 10) {
@@ -146,7 +151,7 @@ struct UsageWidgetView: View {
                         HStack {
                             Text("Today \(Format.cost(s.today.cost))"); Spacer(); Text("7d \(Format.cost(s.last7.cost))")
                         }.font(.caption.bold())
-                        FreshnessCaption(snapshot: s)
+                        FreshnessCaption(snapshot: s, now: entry.date)
                     }
                 }
             } else {

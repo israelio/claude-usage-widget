@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 public enum LimitsError: Error, Equatable, LocalizedError {
-    case noToken, unauthorized, http(Int), badResponse, timeout, keychainBusy
+    case noToken, unauthorized, http(Int), badResponse, timeout, keychainBusy, keychainLocked
     public var errorDescription: String? {
         switch self {
         case .noToken: return "No Claude Code login found in Keychain"
@@ -11,6 +11,7 @@ public enum LimitsError: Error, Equatable, LocalizedError {
         case .badResponse: return "Unexpected usage API response"
         case .timeout: return "Timed out waiting for Keychain/usage API"
         case .keychainBusy: return "Waiting for Keychain access — approve the prompt"
+        case .keychainLocked: return "Keychain is locked — unlock it to refresh"
         }
     }
 }
@@ -143,12 +144,42 @@ public struct KeychainTokenProvider: TokenProviding {
     /// "Always Allow" short-lived. Apple's `security` tool is already trusted by that item (Claude Code writes it with
     /// that tool), so reading through it never prompts. The direct read is only a fallback.
     public static func credentials() throws -> TokenCredentials {
+        try credentials(isLocked: defaultKeychainLocked, read: readCredentials)
+    }
+
+    private static let interactionLock = NSLock()
+    private nonisolated(unsafe) static var _allowUserInteraction = false
+    /// True only while a user-initiated refresh runs; background polls must never raise a Keychain dialog.
+    public static var allowUserInteraction: Bool {
+        get { interactionLock.lock(); defer { interactionLock.unlock() }; return _allowUserInteraction }
+        set { interactionLock.lock(); _allowUserInteraction = newValue; interactionLock.unlock() }
+    }
+
+    /// Refuses to touch the Keychain (no `security`, no SecItem) when it is locked and interaction isn't allowed.
+    static func credentials(isLocked: () -> Bool, allowInteraction: Bool = allowUserInteraction,
+                            read: () throws -> TokenCredentials) throws -> TokenCredentials {
+        if !allowInteraction && isLocked() { throw LimitsError.keychainLocked }
+        return try read()
+    }
+
+    /// Whether the default (login) keychain is locked; assumed unlocked when the status can't be read.
+    static func defaultKeychainLocked() -> Bool {
+        var kc: SecKeychain?
+        guard SecKeychainCopyDefault(&kc) == errSecSuccess, let kc else { return false }
+        var status: SecKeychainStatus = 0
+        guard SecKeychainGetStatus(kc, &status) == errSecSuccess else { return false }
+        return status & SecKeychainStatus(kSecUnlockStateStatus) == 0
+    }
+
+    private static func readCredentials() throws -> TokenCredentials {
         guard KeychainGate.shared.tryEnter() else { throw LimitsError.keychainBusy }
         defer { KeychainGate.shared.leave() }
-        if let c = try? credentialsViaCommand(executable: "/usr/bin/security",
-                                              arguments: ["find-generic-password", "-s", "Claude Code-credentials", "-w"], timeout: 10) {
-            return c
-        }
+        do {
+            return try credentialsViaCommand(executable: "/usr/bin/security",
+                                             arguments: ["find-generic-password", "-s", "Claude Code-credentials", "-w"], timeout: 10)
+        } catch LimitsError.timeout {
+            throw LimitsError.timeout   // a dialog may be showing; a direct read would stack a second one
+        } catch {}
         // Test/diagnostic switch: never fall back to the direct (prompting) read.
         if ProcessInfo.processInfo.environment["CLAUDEUSAGE_KEYCHAIN_MODE"] == "tool-only" { throw LimitsError.noToken }
         let query: [String: Any] = [
