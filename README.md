@@ -21,7 +21,7 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
       <sub>90-day usage history: cost or tokens, model breakdown, CSV export</sub>
       <br><br>
       <img src="docs/images/projects.png" alt="Usage by Project window: projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="560"><br>
-      <sub>Usage by project: click a bar on Daily Usage (project names shown here are placeholders)</sub>
+      <sub>Usage by project: click a bar on Daily Usage. Each project expands to its model breakdown and daily trend (project names here are placeholders)</sub>
     </td>
   </tr>
 </table>
