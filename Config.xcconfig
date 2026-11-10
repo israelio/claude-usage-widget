@@ -1,6 +1,6 @@
 // App version shown in About and the panel title. Bump with scripts/bump-version.sh before tagging a release
 // (release builds also pass MARKETING_VERSION on the command line).
-MARKETING_VERSION = 0.1.11
+MARKETING_VERSION = 0.1.12
 
 // Defaults. Override in Local.xcconfig (gitignored).
 // APP_GROUP_ID must be provisioned for your signing team. On macOS the group id should be prefixed with your
