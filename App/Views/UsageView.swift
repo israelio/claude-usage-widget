@@ -63,6 +63,20 @@ struct UsageView: View {
         }
     }
 
+    /// The part of the 90-day series the top chart draws: exactly the selected range (7, 30 or 90 days), or, for a
+    /// single day, a 14-day window around it so the day has some context.
+    private func visibleDays(_ data: [DailyPoint]) -> [DailyPoint] {
+        switch model.span {
+        case .days(let n): return Array(data.suffix(n))
+        case .day(let d):
+            guard let i = data.firstIndex(where: { Calendar.current.isDate($0.day, inSameDayAs: d) }) else { return Array(data.suffix(14)) }
+            let width = min(14, data.count)
+            let start = min(max(0, i - 9), data.count - width)
+            return Array(data[start..<(start + width)])
+        case .session, .sessions: return data
+        }
+    }
+
     var body: some View {
         let data = sessionsMode ? [] : service.daily(days: HistoryData.keepDays)
         VStack(alignment: .leading, spacing: 12) {
@@ -70,7 +84,7 @@ struct UsageView: View {
             if sessionsMode {
                 sessionsChart
             } else {
-                UsageDailyChart(points: data, showCost: showCost,
+                UsageDailyChart(points: visibleDays(data), showCost: showCost,
                                 isSelected: { inRange($0, in: data) },
                                 onSelect: { model.select(.day($0)) })
             }
