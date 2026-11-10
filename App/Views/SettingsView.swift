@@ -41,6 +41,22 @@ struct SettingsView: View {
                 Text("Anthropic limits how often usage can be requested; shorter intervals may get blocked.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Desktop widgets") {
+                LabeledContent("Status") {
+                    switch widgetStatus.placedCount {
+                    case .none: Text("Checking…").foregroundStyle(.secondary)
+                    case .some(0): Text("None added yet").foregroundStyle(.secondary)
+                    case .some(let n): Text("\(n) widget\(n == 1 ? "" : "s") on your desktop").foregroundStyle(.green)
+                    }
+                }
+                HStack {
+                    Button("How to add widgets…") { WidgetGuideWindowController.shared.show(firstRun: false) }
+                    Button("Widget style…") { DesktopSettingsLink.open() }
+                    Button("Refresh widgets") { WidgetCenter.shared.reloadAllTimelines() }
+                }
+                Text("macOS doesn't let apps place widgets for you; Edit Widgets on the desktop does.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Notifications") {
                 Toggle("Burn-rate warning", isOn: $settings.prefs.alerts.burnRate)
                 Toggle("Reset notice", isOn: $settings.prefs.alerts.resetNotice)
@@ -54,22 +70,6 @@ struct SettingsView: View {
                     .focused($thresholdFocused)
                     .onSubmit(commitThresholds)
                     .onChange(of: thresholdFocused) { _, f in if !f { commitThresholds() } }
-            }
-            Section("Desktop widgets") {
-                LabeledContent("Status") {
-                    switch widgetStatus.placedCount {
-                    case .none: Text("Checking…").foregroundStyle(.secondary)
-                    case .some(0): Text("None added yet").foregroundStyle(.secondary)
-                    case .some(let n): Text("\(n) widget\(n == 1 ? "" : "s") on your desktop").foregroundStyle(.green)
-                    }
-                }
-                HStack {
-                    Button("How to add widgets…") { WidgetGuideWindowController.shared.show(firstRun: false) }
-                    Button("Widget style (Full-color / Monochrome)…") { DesktopSettingsLink.open() }
-                    Button("Refresh widgets") { WidgetCenter.shared.reloadAllTimelines() }
-                }
-                Text("macOS doesn't let apps place widgets for you; Edit Widgets on the desktop does.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Updates") {
                 Toggle("Install updates automatically", isOn: $settings.prefs.autoUpdate)

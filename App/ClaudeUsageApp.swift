@@ -59,6 +59,7 @@ private struct MenuBarPopover: View {
 private struct LabelHost: View {
     @ObservedObject var service: UsageService
     @ObservedObject var settings: AppSettings
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         let tip = MenuBarLabel.tooltip(service: service, prefs: settings.prefs)
@@ -87,6 +88,11 @@ private struct LabelHost: View {
                 //   CLAUDEUSAGE_USAGE_GROUPBY=model   (env var) groups by model instead of project
                 //   CLAUDEUSAGE_USAGE_GRANULARITY=sessions|days  (env var) overrides the saved Days / Sessions choice
                 let args = CommandLine.arguments
+                if args.contains("--show-settings") {   // developer aid: open the Settings window
+                    try? await Task.sleep(nanoseconds: 7_000_000_000)
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
+                }
                 if let a = args.first(where: { $0.hasPrefix("--show-projects") }) {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     UsageWindowController.shared.configure(service: service)
