@@ -14,37 +14,37 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
   <tr>
     <td valign="top" align="center">
       <img src="docs/images/popover.png" alt="Claude Usage panel: session, weekly and Fable limits with pace markers, pace chart, daily usage, token costs and plan" width="300"><br>
-      <sub>The panel: limits, pace, daily usage, tokens and plan</sub>
+      <sub><b>The panel</b>: limits, pace, daily usage, tokens and plan</sub>
     </td>
     <td valign="top" align="center">
-      <img src="docs/images/usage-projects.png" alt="Usage window grouped by project: 90-day daily chart on top, projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="640"><br>
-      <sub>The Usage window, grouped by project: click a bar on Daily Usage (or the footer button). Each project expands to its model split and daily trend (project names here are placeholders)</sub>
-      <br><br>
-      <img src="docs/images/usage-models.png" alt="Usage window grouped by model: models ranked by cost, with an expanded model listing the projects that used it and a daily cost chart" width="640"><br>
-      <sub>Grouped by model: which projects used each model</sub>
-      <br><br>
-      <img src="docs/images/usage-sessions.png" alt="Usage window in Sessions mode: one bar per 5-hour work session over the last 7 days, with projects ranked by cost and an expanded project showing a cost-per-session chart" width="640"><br>
-      <sub>Sessions mode: Claude's rolling 5-hour work windows instead of days</sub>
+      <img src="docs/images/widgets-color.png" alt="Claude Usage desktop widgets in full-color style" width="235">
+      &nbsp;
+      <img src="docs/images/widgets-mono.png" alt="Claude Usage desktop widgets in monochrome style" width="235"><br>
+      <sub><b>Desktop widgets</b>: full-color (left) and the monochrome macOS default (right). Small, medium and large; click one to open the panel.</sub>
     </td>
   </tr>
 </table>
-
-### Desktop widgets
 
 <table>
   <tr>
-    <td align="center" valign="top">
-      <img src="docs/images/widgets-color.png" alt="Claude Usage desktop widgets in full-color style" width="240"><br>
-      <sub><b>Full-color style</b></sub>
+    <td valign="top" align="center" width="33%">
+      <a href="docs/images/usage-projects.png"><img src="docs/images/usage-projects.png" alt="Usage window grouped by project: 90-day daily chart on top, projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="290"></a><br>
+      <sub><b>Usage, by project</b>: each project expands to its model split and daily trend</sub>
     </td>
-    <td align="center" valign="top">
-      <img src="docs/images/widgets-mono.png" alt="Claude Usage desktop widgets in monochrome style" width="240"><br>
-      <sub><b>Monochrome style</b> (macOS default "Automatic")</sub>
+    <td valign="top" align="center" width="33%">
+      <a href="docs/images/usage-models.png"><img src="docs/images/usage-models.png" alt="Usage window grouped by model: models ranked by cost, with an expanded model listing the projects that used it and a daily cost chart" width="290"></a><br>
+      <sub><b>Usage, by model</b>: which projects used each model</sub>
+    </td>
+    <td valign="top" align="center" width="33%">
+      <a href="docs/images/usage-sessions.png"><img src="docs/images/usage-sessions.png" alt="Usage window in Sessions mode: one bar per 5-hour work session over the last 7 days, with projects ranked by cost and an expanded project showing a cost-per-session chart" width="290"></a><br>
+      <sub><b>Usage, by session</b>: Claude's rolling 5-hour work windows</sub>
     </td>
   </tr>
 </table>
 
-Small, medium and large widgets. Add them from **Edit Widgets** on the desktop and click a widget to open the panel. macOS shows desktop widgets in the monochrome style unless you pick **System Settings → Desktop & Dock → Widgets → Widget style → Full-color**; the widgets are readable in both.
+<sub>Click a Usage screenshot for the full size. Project names in them are placeholders.</sub>
+
+Add the widgets from **Edit Widgets** on the desktop. macOS shows desktop widgets in the monochrome style unless you pick **System Settings → Desktop & Dock → Widgets → Widget style → Full-color**; the widgets are readable in both.
 
 ## Features
 
