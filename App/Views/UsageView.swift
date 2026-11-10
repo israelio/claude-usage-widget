@@ -41,7 +41,26 @@ struct UsageView: View {
             sessionsMode ? "sessions" : "days"
         } set: { g in
             granularity = g
-            model.select(g == "sessions" ? .sessions(7) : .days(30))
+            model.select(Self.converted(model.span, toSessions: g == "sessions", sessions: service.sessions))
+        }
+    }
+
+    /// The same selection expressed in the other granularity, so switching Days | Sessions keeps the range: 7 days stays
+    /// 7 days (90 days becomes the 30-day maximum for sessions), a single day becomes that day's busiest session, and
+    /// a single session becomes the day it started on.
+    static func converted(_ span: UsageSpan, toSessions: Bool, sessions: [UsageSession]) -> UsageSpan {
+        let cal = Calendar.current
+        switch (toSessions, span) {
+        case (true, .days(let n)): return .sessions(min(n, 30))
+        case (true, .day(let d)):
+            let that = sessions.filter { cal.isDate($0.start, inSameDayAs: d) }
+            if let s = that.max(by: { $0.tokens.total < $1.tokens.total }) { return .session(s.id) }
+            return .sessions(7)
+        case (false, .sessions(let n)): return .days(n)
+        case (false, .session(let i)):
+            if let s = sessions.first(where: { $0.id == i }) { return .day(cal.startOfDay(for: s.start)) }
+            return .days(7)
+        default: return span
         }
     }
     private var dayBinding: Binding<Date> {
@@ -106,6 +125,10 @@ struct UsageView: View {
         .onAppear {
             // Developer/screenshot aid: CLAUDEUSAGE_USAGE_GROUPBY=model (or project) overrides the saved choice.
             if let g = ProcessInfo.processInfo.environment["CLAUDEUSAGE_USAGE_GROUPBY"], g == "model" || g == "project" { groupBy = g }
+            // Developer aid: CLAUDEUSAGE_TEST_SWITCH=days|sessions flips the Days | Sessions switch a few seconds after appearing.
+            if let t = ProcessInfo.processInfo.environment["CLAUDEUSAGE_TEST_SWITCH"], t == "days" || t == "sessions" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) { granularityChoice.wrappedValue = t }
+            }
             // Developer aid: CLAUDEUSAGE_SHOW_GRANULARITY_HELP=1 opens the Days vs Sessions popover on appear.
             if ProcessInfo.processInfo.environment["CLAUDEUSAGE_SHOW_GRANULARITY_HELP"] != nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4) { showGranularityHelp = true }
@@ -173,7 +196,8 @@ struct UsageView: View {
                 }.pickerStyle(.menu).labelsHidden().fixedSize()
             } else {
                 Picker("", selection: rangeChoice) {
-                    Text("Day").tag(0); Text("7 days").tag(7); Text("30 days").tag(30); Text("90 days").tag(90)
+                    Text("Day").tag(0); Text("3 days").tag(3); Text("7 days").tag(7); Text("14 days").tag(14)
+                    Text("30 days").tag(30); Text("90 days").tag(90)
                 }.pickerStyle(.menu).labelsHidden().fixedSize()
             }
             Picker("", selection: $metric) { Text("Cost").tag("cost"); Text("Tokens").tag("tokens") }
