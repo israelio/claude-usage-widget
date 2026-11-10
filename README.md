@@ -85,6 +85,27 @@ More:
 - **Offline fallback** — if the usage endpoint or Keychain is unavailable, usage is estimated from your local logs and marked as estimated. The last real values are kept and shown as stale rather than replaced.
 - **Light and dark** — follows your system appearance with a glass material.
 
+### Days vs Sessions
+
+The Usage window can slice your usage two ways. The ⓘ next to the **Days | Sessions** switch explains this in the app, and each mode shows a one-line caption under the chart.
+
+| | **Days** (for example 7 days) | **Sessions** (for example 7 days) |
+|---|---|---|
+| One bar is | one calendar day, midnight to midnight in your local time | one Claude work session: a 5-hour window that starts at your first message (the same windows Claude's usage limit uses) |
+| Bars for 7 days | 7 | as many sessions as there were (for example 21) |
+| Usage across midnight | split between the two days | stays in one session |
+| Data available | 90 days | the hourly detail the app has: roughly the last month of your Claude Code logs, then it keeps growing |
+| Best for | daily spend and trends | seeing what used up a limit window and how heavy each work block was |
+
+Both cover the same period ("7 days" means the last 7 days in either mode), and the Project and Model tables work the same way in both. One difference: a session that began just before the period is counted whole, so a Sessions total can be slightly higher than the matching Days total.
+
+## What's new in v0.1.12
+
+- **Desktop widget guide.** The first time you run the app it asks whether you want desktop widgets and shows the steps, because macOS only lets you add widgets yourself. It also detects whether widgets are placed. The same guide is under Settings → Desktop widgets, with shortcuts to the widget style setting and a refresh button.
+- **Usage window.** In Days mode the top chart now shows only the selected range (7, 30 or 90 days, or a 14-day window around a single day) instead of always drawing 90 days. It opens above the menu bar popover instead of underneath it, and an ⓘ explains Days vs Sessions.
+- **Laptop screens.** The Daily Usage and Pace charts are taller in the compact layout.
+- **Homebrew.** `brew install --cask israelio/tap/claude-usage`.
+
 ## What's new in v0.1.11
 
 - **Sessions in the Usage window.** Claude's limits use rolling 5-hour windows that start at your first message, so the Usage window can now show those work sessions as well as days. Switch **Days | Sessions** in the top bar: the chart shows one bar per session (cost or tokens), you can step through sessions, jump to a date, or aggregate the sessions of the last 3, 7, 14 or 30 days, and the project and model tables (with an hourly or per-session trend) and a new **Sessions** CSV export follow the selection. Retention caveat: hourly detail is built once from the logs Claude Code still keeps and then accumulates, so sessions only go back as far as that; the window says so when a range reaches earlier.

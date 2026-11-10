@@ -88,6 +88,10 @@ struct UsageView: View {
                                 isSelected: { inRange($0, in: data) },
                                 onSelect: { model.select(.day($0)) })
             }
+            Text(sessionsMode
+                 ? "Each bar is one Claude work session: a 5-hour window that starts at your first message (the windows Claude's usage limit uses), not a calendar day."
+                 : "Each bar is one calendar day, midnight to midnight in your local time.")
+                .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             tableSection
         }
         .padding(20)
@@ -102,6 +106,10 @@ struct UsageView: View {
         .onAppear {
             // Developer/screenshot aid: CLAUDEUSAGE_USAGE_GROUPBY=model (or project) overrides the saved choice.
             if let g = ProcessInfo.processInfo.environment["CLAUDEUSAGE_USAGE_GROUPBY"], g == "model" || g == "project" { groupBy = g }
+            // Developer aid: CLAUDEUSAGE_SHOW_GRANULARITY_HELP=1 opens the Days vs Sessions popover on appear.
+            if ProcessInfo.processInfo.environment["CLAUDEUSAGE_SHOW_GRANULARITY_HELP"] != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { showGranularityHelp = true }
+            }
         }
     }
 
@@ -148,11 +156,17 @@ struct UsageView: View {
         }
     }
 
+    @State private var showGranularityHelp = false
+
     private var topBar: some View {
         HStack(spacing: 12) {
             Picker("", selection: granularityChoice) { Text("Days").tag("days"); Text("Sessions").tag("sessions") }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 150)
                 .help("Days, or Claude's rolling 5-hour work sessions")
+            Button { showGranularityHelp.toggle() } label: { Image(systemName: "info.circle") }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .help("What's the difference between Days and Sessions?")
+                .popover(isPresented: $showGranularityHelp, arrowEdge: .bottom) { GranularityHelp() }
             if sessionsMode {
                 Picker("", selection: sessionRangeChoice) {
                     Text("Session").tag(0); Text("3 days").tag(3); Text("7 days").tag(7); Text("14 days").tag(14); Text("30 days").tag(30)
