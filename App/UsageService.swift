@@ -276,7 +276,7 @@ final class UsageService: ObservableObject {
         Aggregator.daily(history, prices: settings.prefs.prices, days: days, now: Date())
     }
 
-    /// The earliest day with any usage in the history (the lower bound of the project window's date picker).
+    /// The earliest day with any usage in the history (the lower bound of the Usage window's date picker).
     var earliestDay: Date? {
         guard let k = history.days.keys.min() else { return nil }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
@@ -285,6 +285,10 @@ final class UsageService: ObservableObject {
 
     func byProject(range: ProjectRange) -> ProjectBreakdown {
         Aggregator.byProject(history, prices: settings.prefs.prices, range: range, now: Date())
+    }
+
+    func byModel(range: ProjectRange) -> ModelBreakdown {
+        Aggregator.byModel(history, prices: settings.prefs.prices, range: range, now: Date())
     }
 
     private func writeSnapshot(_ l: LimitsSnapshot, _ s: UsageSummary, _ h: HistoryData, _ now: Date,

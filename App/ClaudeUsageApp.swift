@@ -26,8 +26,7 @@ struct ClaudeUsageApp: App {
                 .onAppear {
                     // Hand the panel the app's real (installed) service; creating one in init() would be a separate copy.
                     PanelController.shared.configure(service: service, settings: settings)
-                    HistoryWindowController.shared.configure(service: service)
-                    ProjectsWindowController.shared.configure(service: service)
+                    UsageWindowController.shared.configure(service: service)
                     service.start(); Updater.shared.start(); syncPanel()
                 }   // start() also performs the first refresh
         }
@@ -49,9 +48,8 @@ private struct MenuBarPopover: View {
 
     var body: some View {
         PopoverView(service: service,
-                    openHistory: { HistoryWindowController.shared.show() },
                     openSettings: { NSApp.activate(ignoringOtherApps: true); openSettings() },
-                    openProjects: { ProjectsWindowController.shared.show(day: $0, attachTo: nil) })
+                    openUsage: { UsageWindowController.shared.show(day: $0, attachTo: nil) })
     }
 }
 
@@ -75,24 +73,26 @@ private struct LabelHost: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { StatusItemTooltip.apply(tip) }
             }
             .task {
-                // Developer conveniences (README screenshots / checks):
-                //   --show-history           opens History as the panel's button does (glued to the panel if visible)
-                //   --show-history-menubar   opens History as the menu bar popover's button does (free-standing)
-                //   --show-projects[=-N]     opens "Usage by Project" free-standing for 30d (or for the day N days ago)
-                //   CLAUDEUSAGE_PROJECTS_EXPAND=N  (env var) expands the first N project rows in that window on appear
-                //                            (99 also expands the "Other" group)
+                // Developer conveniences (README screenshots / checks), all opening the Usage window:
+                //   --show-history           for 90 days, as the panel's footer button does (glued to the panel if visible)
+                //   --show-history-menubar   for 90 days, as the menu bar popover's button does (free-standing)
+                //   --show-projects[=-N]     free-standing for 30 days (or for the day N days ago)
+                //   CLAUDEUSAGE_PROJECTS_EXPAND=N  (env var) expands the first N rows in that window on appear
+                //                            (99 also expands the "Other" project group)
+                //   CLAUDEUSAGE_ANONYMIZE_PROJECTS=1  (env var) shows placeholder project names
+                //   CLAUDEUSAGE_USAGE_GROUPBY=model   (env var) groups by model instead of project
                 let args = CommandLine.arguments
                 if let a = args.first(where: { $0.hasPrefix("--show-projects") }) {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    ProjectsWindowController.shared.configure(service: service)
+                    UsageWindowController.shared.configure(service: service)
                     var day: Date? = nil
                     if let n = Int(a.dropFirst("--show-projects=".count)), a.contains("=") { day = Calendar.current.date(byAdding: .day, value: -abs(n), to: Date()) }
-                    ProjectsWindowController.shared.show(day: day, attachTo: nil)
+                    UsageWindowController.shared.show(day: day, attachTo: nil)
                 }
                 if args.contains("--show-history") || args.contains("--show-history-menubar") {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the pinned panel appear first
-                    HistoryWindowController.shared.configure(service: service)
-                    HistoryWindowController.shared.show(attachTo: args.contains("--show-history") ? PanelController.shared.visiblePanel : nil)
+                    UsageWindowController.shared.configure(service: service)
+                    UsageWindowController.shared.show(day: nil, days: 90, attachTo: args.contains("--show-history") ? PanelController.shared.visiblePanel : nil)
                 }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 StatusItemTooltip.apply(MenuBarLabel.tooltip(service: service, prefs: settings.prefs))

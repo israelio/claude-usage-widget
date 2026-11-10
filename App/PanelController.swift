@@ -25,12 +25,11 @@ final class PanelController {
         if panel == nil {
             panel = FloatingPanel(content: PopoverView(
                 service: service,
-                openHistory: { [weak self] in HistoryWindowController.shared.show(attachTo: self?.visiblePanel) },
                 openSettings: {
                     NSApp.activate(ignoringOtherApps: true)
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 },
-                openProjects: { [weak self] day in ProjectsWindowController.shared.show(day: day, attachTo: self?.visiblePanel) },
+                openUsage: { [weak self] day in UsageWindowController.shared.show(day: day, attachTo: self?.visiblePanel) },
                 panelHeight: nil,
                 onContentHeight: { [weak self] h in Task { @MainActor in self?.fitToContent(h) } }),
                 onClose: { Task { @MainActor in settings.prefs.floatingPanel = false } })

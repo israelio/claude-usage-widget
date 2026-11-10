@@ -14,10 +14,9 @@ struct PopoverView: View {
     static func preferredHeight(for screen: NSScreen?) -> CGFloat { min(fullLayoutHeight, availableHeight(for: screen)) }
 
     @ObservedObject var service: UsageService
-    var openHistory: () -> Void
     var openSettings: () -> Void
-    /// Opens the per-project breakdown, for the clicked day on the Daily Usage chart.
-    var openProjects: (Date?) -> Void = { _ in }
+    /// Opens the Usage window: for the clicked day on the Daily Usage chart, or nil from the footer button.
+    var openUsage: (Date?) -> Void = { _ in }
     /// Fixed height for the menu bar popover; nil lets the content fill its container (the resizable floating panel).
     var panelHeight: CGFloat? = PopoverView.preferredHeight
     /// Reports the height the content wants (used by the floating panel to size itself to its content).
@@ -55,7 +54,7 @@ struct PopoverView: View {
                 } else {
                     ProgressView().padding()
                 }
-                DailyCard(service: service, openProjects: openProjects)
+                DailyCard(service: service, openUsage: openUsage)
                 TokenCard(summary: service.summary)
                 if let p = service.plan { PlanCard(plan: p, extraUsage: service.limits?.extraUsage) }
                 if !compact { GlassCard {
@@ -123,7 +122,7 @@ struct PopoverView: View {
                 }
                 Spacer()
                 RaisedIconButton(systemImage: "arrow.clockwise", help: "Refresh now") { service.refreshNow() }
-                RaisedIconButton(systemImage: "chart.bar.doc.horizontal", help: "90-day usage history") { openHistory() }
+                RaisedIconButton(systemImage: "chart.bar.doc.horizontal", help: "Usage details") { openUsage(nil) }
                 RaisedIconButton(systemImage: "gearshape", help: "Settings") { openSettings() }
                 RaisedIconButton(systemImage: "star.circle", help: "About — Staraware: pay with a GitHub star") { showAbout.toggle() }
                     .popover(isPresented: $showAbout, arrowEdge: .top) { AboutView() }

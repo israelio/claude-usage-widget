@@ -2,7 +2,7 @@
 
 # Claude Usage Widget
 
-A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code usage** at a glance: 5-hour session, weekly limit, pace, 90-day token and cost history, and smart notifications.
+A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code usage** at a glance: 5-hour session, weekly limit, pace, a 90-day usage window (by project and by model), and smart notifications.
 
 **[⬇️ Download the latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** · [All releases](https://github.com/israelio/claude-usage-widget/releases)
 
@@ -17,11 +17,8 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
       <sub>The panel: limits, pace, daily usage, tokens and plan</sub>
     </td>
     <td valign="top" align="center">
-      <img src="docs/images/history.png" alt="90-day usage history window with cost chart, model breakdown and totals" width="560"><br>
-      <sub>90-day usage history: cost or tokens, model breakdown, CSV export</sub>
-      <br><br>
-      <img src="docs/images/projects.png" alt="Usage by Project window: projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="560"><br>
-      <sub>Usage by project: click a bar on Daily Usage. Each project expands to its model breakdown and daily trend (project names here are placeholders)</sub>
+      <img src="docs/images/projects.png" alt="Usage window: 90-day daily chart on top, projects ranked by cost with share bars below, and an expanded project showing its model split and a daily cost chart" width="640"><br>
+      <sub>The Usage window: click a bar on Daily Usage (or the footer button). Group by project or model; each row expands to its breakdown and daily trend (project names here are placeholders)</sub>
     </td>
   </tr>
 </table>
@@ -50,18 +47,17 @@ Top to bottom, the panel shows its title and version, then:
 - **5-Hour Session / Weekly Limit / Weekly Fable** — percent used, a progress bar, and when the window resets (countdown plus clock time). The green/red `▼9%` / `▲9%` next to the percent is how far you are below/above a perfectly even burn rate for that window. The label on the right says **On track**, **Ahead of pace** or **Will exceed**, based on where your current rate would land at reset. The third card is the per-model weekly window (Fable, when your plan has one).
 - **Pace** — a chart of your pace over the current 5-hour window. Above the 0% line means you are using it faster than evenly; below means slower. It fills in as the app collects samples.
 - **Daily Usage** — cost per day with a **7d / 30d / 90d** switch.
-- **Usage by project** — click a bar on Daily Usage to open a window showing which projects used that day's tokens and cost; widen it to 7, 30 or 90 days, switch between cost and tokens, and click a project for its breakdown by model (cost and tokens per model) and daily trend. Git worktrees and sub-folders are merged into their main repository, and **Export CSV** saves the table, or one row per project and model ("Projects by model"). History from before per-project tracking (or from logs Claude Code no longer keeps) appears as "Earlier (unknown)".
+- **Usage window** — click a bar on Daily Usage (or the chart button in the footer) to open one window with the 90-day daily chart on top, switchable between cost and tokens; click a bar to pick that day, or choose a day (with previous/next and a date picker) or the last 7, 30 or 90 days, and the chart highlights the range. Below, **Group by Project** lists which projects used the range's tokens and cost, and each project expands to its per-model breakdown and daily trend; **Group by Model** lists the models across all projects, and each model expands to the projects that used it and its daily trend. Git worktrees and sub-folders are merged into their main repository, and **Export** saves CSV: daily totals, projects, projects by model, or models by project. History from before per-project tracking (or from logs Claude Code no longer keeps) appears as "Earlier (unknown)".
 - **Token Usage** — input, output and cache tokens plus cost for Today, Last 7 Days, This Month and Last 30 Days, then each model's share of your last 30 days of spend. Costs are API-equivalent estimates from an editable price table, not your subscription bill.
 - **Plan** — your plan (for example Max 5x) and subscription status, the estimated renewal date, and extra-usage spend if you have it enabled. Anthropic doesn't expose the renewal date, so it is estimated as the next monthly anniversary of your subscription start; annual plans renew on a different schedule.
 - **Next refresh** — countdown to the next poll. If the live endpoint is unreachable it shows "updated Xm ago" or an "estimated" badge instead.
 - **Used or left** — show usage as percent used or percent remaining (`98% left`) in the menu bar and the widgets: Settings → Display → *Show usage as*, or per widget via right-click → *Edit Widget* (*Same as app setting* / *Used* / *Left*). The small widget can also show either the 5-hour session or the weekly limit. Colours always follow how much you have used.
-- **Footer** — open Claude's usage page, refresh now, open the 90-day History window, Settings, About, and Quit.
+- **Footer** — open Claude's usage page, refresh now, open the Usage window, Settings, About, and Quit.
 
 More:
 
 - **Menu bar** — a compact label such as `🟢 42% ▼7% · 71%` (colour shows how close you are to the limit). Choose session %, session + weekly, or icon only in Settings, or pick exactly what to show (status dot, session, pace, weekly, per-model weekly such as Fable, today's cost, session reset countdown) under Settings → Display → Menu bar → Custom….
 - **Floating panel** — turn on *Floating always-on-top panel* in Settings to pin the same view on your desktop. It remembers its position.
-- **90-day history** — a daily chart you can switch between cost and tokens, last-30-day model breakdown, totals, and **Export CSV**.
 - **Smart notifications**
   - *Thresholds*: one alert per window at the highest level crossed (default 50/75/90%, editable).
   - *Burn-rate warning*: you are on course to hit the limit before it resets.
@@ -75,7 +71,7 @@ More:
 
 ## What's new in v0.1.10
 
-- **Usage by Project.** Click a bar on the Daily Usage chart to see which projects used the day's tokens and cost. Pick a specific date, step to the previous or next day, or widen to 7, 30 or 90 days; switch between cost and tokens, expand a project for a per-model breakdown (cost and tokens per model) and a labelled daily trend, and export the table to CSV, optionally by model. Git worktrees are merged into their main repository.
+- **One Usage window.** Click a bar on the Daily Usage chart, or use the footer button, to open a single window with the 90-day chart (cost or tokens, bars in the chosen range highlighted, click a bar to pick that day). Pick a date, step to the previous or next day, or widen to 7, 30 or 90 days, then group by project (expand a project for a per-model breakdown) or by model (expand a model for the projects that used it), each with a labelled daily trend. Export daily totals, projects, projects by model or models by project to CSV. Git worktrees are merged into their main repository. This replaces the separate History and Usage by Project windows.
 - **Far fewer requests to Anthropic's usage API.** Anthropic limits how often usage can be requested, and the app used to hit that limit after waking from sleep. It now asks at most every 5 minutes while Claude is in use and every 15 minutes when idle, remembers the last answer across restarts and updates, waits calmly after wake, and backs off (honouring the server's retry hint) if it is rate limited.
 - **Honest widgets.** If a refresh fails (for example a rate limit) the widgets show "Couldn't refresh · updated HH:mm", and old data is marked "Stale" by itself even if macOS never reloads the widget.
 - Refresh interval in Settings is now 2 to 15 minutes.
@@ -150,7 +146,7 @@ xcodebuild -project ClaudeUsageWidget.xcodeproj -scheme ClaudeUsageWidget \
 Code layout:
 
 - `Packages/UsageCore` — parsing, pricing, history, pace, alerts, limits client (unit tested)
-- `App/` — SwiftUI menu bar app, popover, floating panel, settings, history
+- `App/` — SwiftUI menu bar app, popover, floating panel, settings, usage window
 - `Widget/` — WidgetKit extension
 - `project.yml` — XcodeGen project definition
 - `scripts/make-dmg.sh` — builds a DMG

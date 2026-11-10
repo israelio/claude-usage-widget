@@ -5,8 +5,8 @@ import UsageCore
 struct DailyCard: View {
     @Environment(\.compact) private var compact
     @ObservedObject var service: UsageService
-    /// Called with the day of a clicked bar (opens the per-project breakdown).
-    var openProjects: (Date?) -> Void = { _ in }
+    /// Called with the day of a clicked bar (opens the Usage window on that day).
+    var openUsage: (Date?) -> Void = { _ in }
     @State private var range = 7
     @State private var selected: Date?
     @AppStorage("dailyChartMetric") private var metric = "cost"
@@ -49,7 +49,7 @@ struct DailyCard: View {
                                         Text("In \(Format.tokens(h.tokens.input)) · Out \(Format.tokens(h.tokens.output)) · Cache \(Format.tokens(h.tokens.cache))")
                                             .foregroundStyle(.secondary)
                                     }
-                                    Text("Click for project breakdown").foregroundStyle(.secondary)
+                                    Text("Click for usage details").foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -69,7 +69,7 @@ struct DailyCard: View {
                             }
                         }
                         .onTapGesture { loc in
-                            if let d = day(at: loc, proxy: proxy, geo: geo, in: data) { openProjects(d) }
+                            if let d = day(at: loc, proxy: proxy, geo: geo, in: data) { openUsage(d) }
                         }
                 }
             }
