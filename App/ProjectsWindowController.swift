@@ -20,7 +20,7 @@ final class ProjectsWindowController {
     /// - attachTo: the floating panel to glue the window to, or nil for a free-standing window.
     func show(day: Date?, attachTo panel: NSWindow? = nil) {
         guard let service else { return }
-        model.open(day: day)
+        model.open(day: day)   // nil -> last 30 days
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable],

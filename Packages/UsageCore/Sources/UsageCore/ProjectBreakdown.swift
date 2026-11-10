@@ -3,6 +3,8 @@ import Foundation
 public enum ProjectRange: Equatable, Sendable {
     case day(Date)
     case lastDays(Int)
+    /// `days` days ending on (and including) `end`, which need not be today.
+    case window(end: Date, days: Int)
 }
 
 public struct ProjectRow: Equatable, Sendable, Identifiable {
@@ -69,6 +71,8 @@ extension Aggregator {
         let dates: [Date]
         switch range {
         case .day(let d): dates = [calendar.startOfDay(for: d)]
+        case .window(let end, let n):
+            dates = (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: end)!) }
         case .lastDays(let n):
             dates = (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: now)!) }
         }

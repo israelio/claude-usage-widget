@@ -79,6 +79,8 @@ private struct LabelHost: View {
                 //   --show-history           opens History as the panel's button does (glued to the panel if visible)
                 //   --show-history-menubar   opens History as the menu bar popover's button does (free-standing)
                 //   --show-projects[=-N]     opens "Usage by Project" free-standing for 30d (or for the day N days ago)
+                //   CLAUDEUSAGE_PROJECTS_EXPAND=N  (env var) expands the first N project rows in that window on appear
+                //                            (99 also expands the "Other" group)
                 let args = CommandLine.arguments
                 if let a = args.first(where: { $0.hasPrefix("--show-projects") }) {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)

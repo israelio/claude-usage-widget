@@ -17,6 +17,7 @@ public struct DailyPoint: Codable, Equatable, Sendable, Identifiable {
     public var tokens: TokenCounts
     public var cost: Double
     public var id: Date { day }
+    public init(day: Date, tokens: TokenCounts, cost: Double) { self.day = day; self.tokens = tokens; self.cost = cost }
 }
 
 public struct UsageSummary: Codable, Equatable, Sendable {
