@@ -102,7 +102,7 @@ Both cover the same period ("7 days" means the last 7 days in either mode), and 
 ## What's new in v0.1.12
 
 - **Desktop widget guide.** The first time you run the app it asks whether you want desktop widgets and shows the steps, because macOS only lets you add widgets yourself. It also detects whether widgets are placed. The same guide is under Settings → Desktop widgets, with shortcuts to the widget style setting and a refresh button.
-- **Usage window.** In Days mode the top chart now shows only the selected range (7, 30 or 90 days, or a 14-day window around a single day) instead of always drawing 90 days. It opens above the menu bar popover instead of underneath it, and an ⓘ explains Days vs Sessions.
+- **Usage window.** In Days mode the top chart now shows only the selected range (7, 30 or 90 days, or a 14-day window around a single day) instead of always drawing 90 days. It opens above the menu bar popover instead of underneath it, and an ⓘ explains Days vs Sessions. Switching between Days and Sessions keeps the selected range (7 days stays 7 days; the Days menu gained 3 and 14 days to match).
 - **Laptop screens.** The Daily Usage and Pace charts are taller in the compact layout.
 - **Homebrew.** `brew install --cask israelio/tap/claude-usage`.
 
