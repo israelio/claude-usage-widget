@@ -6,6 +6,14 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
 
 **[⬇️ Download the latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** · [All releases](https://github.com/israelio/claude-usage-widget/releases)
 
+**Install with Homebrew:**
+
+```sh
+brew install --cask israelio/tap/claude-usage
+```
+
+**Or download:** open the DMG from the latest release, drag **Claude Usage** onto **Applications**, and launch it. It is signed and notarized, so it opens normally; look for the usage label in your menu bar. More details in [Install](#install).
+
 > ⭐ **Staraware.** Instead of paying, pay with a star. If you like it, [star the repo](https://github.com/israelio/claude-usage-widget). Made by Ohad Israeli.
 
 ## Screenshots
