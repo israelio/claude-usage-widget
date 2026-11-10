@@ -19,6 +19,9 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
     <td valign="top" align="center">
       <img src="docs/images/history.png" alt="90-day usage history window with cost chart, model breakdown and totals" width="560"><br>
       <sub>90-day usage history: cost or tokens, model breakdown, CSV export</sub>
+      <br><br>
+      <img src="docs/images/projects.png" alt="Usage by Project window: projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="560"><br>
+      <sub>Usage by project: click a bar on Daily Usage (project names shown here are placeholders)</sub>
     </td>
   </tr>
 </table>
@@ -69,6 +72,15 @@ More:
 - **Settings** — refresh interval, menu bar mode, notification options, fallback token budgets, and the per-model price table.
 - **Offline fallback** — if the usage endpoint or Keychain is unavailable, usage is estimated from your local logs and marked as estimated. The last real values are kept and shown as stale rather than replaced.
 - **Light and dark** — follows your system appearance with a glass material.
+
+## What's new in v0.1.10
+
+- **Usage by Project.** Click a bar on the Daily Usage chart to see which projects used the day's tokens and cost. Pick a specific date, step to the previous or next day, or widen to 7, 30 or 90 days; switch between cost and tokens, expand a project for its model split and a labelled daily trend, and export the table to CSV. Git worktrees are merged into their main repository.
+- **Far fewer requests to Anthropic's usage API.** Anthropic limits how often usage can be requested, and the app used to hit that limit after waking from sleep. It now asks at most every 5 minutes while Claude is in use and every 15 minutes when idle, remembers the last answer across restarts and updates, waits calmly after wake, and backs off (honouring the server's retry hint) if it is rate limited.
+- **Honest widgets.** If a refresh fails (for example a rate limit) the widgets show "Couldn't refresh · updated HH:mm", and old data is marked "Stale" by itself even if macOS never reloads the widget.
+- Refresh interval in Settings is now 2 to 15 minutes.
+
+Earlier versions: see the [release notes](https://github.com/israelio/claude-usage-widget/releases).
 
 ## Requirements
 

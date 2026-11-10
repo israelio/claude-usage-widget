@@ -186,12 +186,12 @@ struct ProjectsView: View {
                 HStack(spacing: 5) {
                     Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary).frame(width: 10)
-                    Text(r.name).lineLimit(1).truncationMode(.middle)
+                    Text(shownName(r, b)).lineLimit(1).truncationMode(.middle)
                         .foregroundStyle(r.isEarlier ? .secondary : .primary)
                 }
                 .padding(.leading, indent ? 18 : 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(r.isEarlier ? "Usage from days before per-project tracking, or logs Claude Code no longer keeps." : (r.root ?? r.name))
+                .help(r.isEarlier ? "Usage from days before per-project tracking, or logs Claude Code no longer keeps." : (Self.anonymize ? shownName(r, b) : (r.root ?? r.name)))
                 Text(Format.cost(r.cost)).monospacedDigit().frame(width: 80, alignment: .trailing)
                     .fontWeight(showCost ? .semibold : .regular)
                 Text(Format.tokens(r.tokens.total)).monospacedDigit().frame(width: 70, alignment: .trailing)
@@ -205,6 +205,16 @@ struct ProjectsView: View {
             .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { toggle(r.id) } }
             if open { detail(r, b, ctx).padding(.leading, indent ? 26 : 8).padding(.trailing, 8).padding(.bottom, 8) }
         }
+    }
+
+    /// Developer/screenshot aid: `CLAUDEUSAGE_ANONYMIZE_PROJECTS=1` shows generic project names (for README images).
+    private static let anonymize = ProcessInfo.processInfo.environment["CLAUDEUSAGE_ANONYMIZE_PROJECTS"] != nil
+    private static let demoNames = ["web-app", "api-service", "mobile-client", "docs-site", "data-pipeline", "infra-tools", "design-system", "cli-tool"]
+    private func shownName(_ r: ProjectRow, _ b: ProjectBreakdown) -> String {
+        guard Self.anonymize, !r.isEarlier else { return r.name }
+        if let i = b.top.firstIndex(where: { $0.id == r.id }), i < Self.demoNames.count { return Self.demoNames[i] }
+        if let j = b.tail.firstIndex(where: { $0.id == r.id }) { return "project-\(j + 1)" }
+        return r.name
     }
 
     private func toggle(_ id: String) {
