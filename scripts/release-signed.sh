@@ -98,6 +98,10 @@ echo "Built and notarized: $DMG"
 if [ "$UPLOAD" = "--upload" ]; then
   gh release upload "v$VERSION" "$DMG" "$DMG.sha256" --repo "$REPO" --clobber
   echo "Uploaded to https://github.com/$REPO/releases/tag/v$VERSION"
+  # Keep the Homebrew cask (israelio/homebrew-tap) pointing at this signed DMG.
+  if ! "$ROOT/scripts/update-cask.sh" "$VERSION" "$(awk '{print $1}' "$DMG.sha256")"; then
+    echo "warning: could not update the Homebrew cask; run scripts/update-cask.sh $VERSION <sha256> by hand" >&2
+  fi
 else
   echo "Not uploaded. To publish: scripts/release-signed.sh $VERSION --upload"
 fi

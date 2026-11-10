@@ -96,6 +96,16 @@ Earlier versions: see the [release notes](https://github.com/israelio/claude-usa
 
 ## Install
 
+### Homebrew
+
+```sh
+brew install --cask israelio/tap/claude-usage
+```
+
+The command is fully qualified, which is also how Homebrew's tap trust is granted for this one cask. The app updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`. To remove it and its data: `brew uninstall --zap --cask claude-usage`. The cask lives in [israelio/homebrew-tap](https://github.com/israelio/homebrew-tap).
+
+### Download
+
 1. Go to the **[latest release](https://github.com/israelio/claude-usage-widget/releases/latest)** and download `ClaudeUsage-<version>.dmg` (a `.sha256` checksum is next to it).
 2. Open the DMG and drag **Claude Usage** onto **Applications**.
 3. Launch it. Releases from 0.1.1 on are signed with a Developer ID and notarized by Apple, so it opens normally. (The older 0.1.0 was unsigned: right-click → **Open**.)
