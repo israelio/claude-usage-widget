@@ -35,7 +35,9 @@ struct SettingsView: View {
                     Text("Left").tag(true)
                 }
                 Toggle("Floating always-on-top panel", isOn: $settings.prefs.floatingPanel)
-                Stepper("Refresh every \(settings.prefs.pollSeconds)s", value: $settings.prefs.pollSeconds, in: 30...600, step: 30)
+                Stepper("Refresh at most every \(settings.prefs.pollSeconds / 60) min", value: $settings.prefs.pollSeconds, in: 120...900, step: 60)
+                Text("Anthropic limits how often usage can be requested; shorter intervals may get blocked.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Notifications") {
                 Toggle("Burn-rate warning", isOn: $settings.prefs.alerts.burnRate)

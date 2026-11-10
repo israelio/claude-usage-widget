@@ -5,6 +5,7 @@ public actor UsageIngestor {
     private var scanner: LogScanner?
     private let logsRoot: URL
     private let storeURL: URL
+    private var lastNewCount = 0
 
     public init(logsRoot: URL, storeURL: URL) {
         self.logsRoot = logsRoot
@@ -25,6 +26,7 @@ public actor UsageIngestor {
     public func refreshLogs(now: Date = Date()) -> HistoryData {
         let scanner = ensureLoaded()
         let new = scanner.scan(now: now)
+        lastNewCount = new.count
         var changed = !new.isEmpty
         history.add(new)
         if history.scan != scanner.state { history.scan = scanner.state; changed = true }
@@ -33,6 +35,9 @@ public actor UsageIngestor {
         if changed { scanner.state = history.scan; save() }
         return history
     }
+
+    /// How many new log records the latest `refreshLogs` found.
+    public func lastScanNewCount() -> Int { lastNewCount }
 
     public func record(_ snapshot: LimitsSnapshot) {
         _ = ensureLoaded()

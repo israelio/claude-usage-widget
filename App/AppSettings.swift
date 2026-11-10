@@ -35,7 +35,7 @@ struct Prefs: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         menuBarMode = try c.decodeIfPresent(MenuBarMode.self, forKey: .menuBarMode) ?? .sessionWeekly
         floatingPanel = try c.decodeIfPresent(Bool.self, forKey: .floatingPanel) ?? false
-        pollSeconds = try c.decodeIfPresent(Int.self, forKey: .pollSeconds) ?? 300
+        pollSeconds = max(120, try c.decodeIfPresent(Int.self, forKey: .pollSeconds) ?? 300)   // API budget is tiny
         alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? AlertSettings()
         planLimits = try c.decodeIfPresent(PlanLimits.self, forKey: .planLimits) ?? PlanLimits()
         prices = try c.decodeIfPresent(PriceTable.self, forKey: .prices) ?? .defaults

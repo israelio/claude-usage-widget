@@ -151,7 +151,7 @@ swift test --package-path Packages/UsageCore
 ## Notes and limitations
 
 - **Costs are API-equivalent estimates**, not what a subscription plan bills. Check the default prices in Settings; they may lag current Anthropic pricing.
-- The usage endpoint is **undocumented** and may change. That is why the local fallback exists. It is also rate-limited; when the API answers HTTP 429 the app backs off automatically and keeps showing the last known values.
+- The usage endpoint is **undocumented** and may change. That is why the local fallback exists. It is also rate-limited; when the API answers HTTP 429 the app backs off automatically and keeps showing the last known values. Requests are kept to a minimum: at most every 5 minutes while Claude is in use, every 15 minutes when idle, and the last fetch is remembered across restarts.
 - The login token is only read from the Keychain, kept in memory and sent to Anthropic's API; it is never logged or written to disk. See [Keychain access](#keychain-access).
 
 ## License
