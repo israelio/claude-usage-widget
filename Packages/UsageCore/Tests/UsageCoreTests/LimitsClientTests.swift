@@ -59,11 +59,11 @@ final class LimitsClientTests: XCTestCase {
     }
 
     struct FakeTokens: TokenProviding { func accessToken() throws -> String { "T" } }
-    func client(status: Int, body: String) -> OAuthLimitsClient {
+    func client(status: Int, body: String, headers: [String: String]? = nil) -> OAuthLimitsClient {
         OAuthLimitsClient(tokens: FakeTokens()) { req in
             XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer T")
             XCTAssertEqual(req.value(forHTTPHeaderField: "anthropic-beta"), "oauth-2025-04-20")
-            let resp = HTTPURLResponse(url: req.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            let resp = HTTPURLResponse(url: req.url!, statusCode: status, httpVersion: nil, headerFields: headers)!
             return (Data(body.utf8), resp)
         }
     }
@@ -78,6 +78,46 @@ final class LimitsClientTests: XCTestCase {
     func testFetch500() async {
         do { _ = try await client(status: 500, body: "{}").fetch(); XCTFail() }
         catch { XCTAssertEqual(error as? LimitsError, .http(500)) }
+    }
+    func testFetch429Seconds() async {
+        do { _ = try await client(status: 429, body: "{}", headers: ["Retry-After": "90"]).fetch(); XCTFail() }
+        catch { XCTAssertEqual(error as? LimitsError, .rateLimited(retryAfter: 90)) }
+    }
+    func testFetch429MissingHeader() async {
+        do { _ = try await client(status: 429, body: "{}").fetch(); XCTFail() }
+        catch { XCTAssertEqual(error as? LimitsError, .rateLimited(retryAfter: nil)) }
+    }
+    func testFetch429GarbageHeader() async {
+        do { _ = try await client(status: 429, body: "{}", headers: ["Retry-After": "soon"]).fetch(); XCTFail() }
+        catch { XCTAssertEqual(error as? LimitsError, .rateLimited(retryAfter: nil)) }
+    }
+    func testPlan429() async {
+        do { _ = try await client(status: 429, body: "{}", headers: ["Retry-After": "30"]).fetchPlan(); XCTFail() }
+        catch { XCTAssertEqual(error as? LimitsError, .rateLimited(retryAfter: 30)) }
+    }
+    func testRetryAfterHTTPDate() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)   // Tue, 14 Nov 2023 22:13:20 GMT
+        XCTAssertEqual(RetryAfter.parse("Tue, 14 Nov 2023 22:15:20 GMT", now: now), 120)
+        XCTAssertEqual(RetryAfter.parse("Tue, 14 Nov 2023 22:00:00 GMT", now: now), 0)
+        XCTAssertEqual(RetryAfter.parse("Wed, 15 Nov 2023 22:15:20 GMT", now: now), 3600)
+    }
+    func testRetryAfterClamp() {
+        XCTAssertEqual(RetryAfter.parse("99999"), 3600)
+        XCTAssertEqual(RetryAfter.parse("-5"), 0)
+        XCTAssertNil(RetryAfter.parse(nil))
+        XCTAssertNil(RetryAfter.parse(""))
+    }
+    func testRateLimitedDescription() {
+        XCTAssertEqual(LimitsError.rateLimited(retryAfter: 61).errorDescription, "Rate limited by Anthropic — retrying in 2 min")
+        XCTAssertEqual(LimitsError.rateLimited(retryAfter: nil).errorDescription, "Rate limited by Anthropic — retrying shortly")
+    }
+    func testBackoffPolicy() {
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 1, retryAfter: nil), 120)
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 2, retryAfter: nil), 240)
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 3, retryAfter: 600), 600)
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 1, retryAfter: 30), 120)
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 10, retryAfter: nil), 1800)
+        XCTAssertEqual(RateLimitBackoff.delay(consecutive429: 99, retryAfter: 3600), 1800)
     }
 }
 
@@ -112,5 +152,20 @@ final class KeychainGateTests: XCTestCase {
         let s = try await c.fetch()
         XCTAssertEqual(s.fiveHour?.utilization, 1)
         try await Task.sleep(nanoseconds: 400_000_000)
+    }
+}
+
+final class SharedSnapshotRefreshErrorTests: XCTestCase {
+    func testRefreshErrorAffectsDisplayAndDecodesWhenAbsent() throws {
+        let a = SharedSnapshot(limits: nil, today: .zero, last7: .zero, daily: [], updatedAt: Date())
+        var b = a; b.refreshError = "Rate limited"
+        XCTAssertFalse(a.displayEquals(b))
+        var c = a; c.refreshError = "Other text"
+        XCTAssertTrue(b.displayEquals(c))
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: enc.encode(a)) as? [String: Any])
+        json["refreshError"] = nil
+        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+        XCTAssertNil(try dec.decode(SharedSnapshot.self, from: JSONSerialization.data(withJSONObject: json)).refreshError)
     }
 }

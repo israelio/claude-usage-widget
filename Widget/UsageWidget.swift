@@ -57,8 +57,11 @@ struct Provider: AppIntentTimelineProvider {
     }
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<UsageEntry> {
         beat()
-        let entry = UsageEntry(date: Date(), snapshot: load(), configuration: configuration)
-        return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(15 * 60)))
+        // Entries every 15 minutes for 6 hours with the same data, so ages, countdowns and the stale marker keep
+        // advancing even if no reload ever happens.
+        let now = Date(), snap = load()
+        let entries = (0...24).map { UsageEntry(date: now.addingTimeInterval(Double($0) * 15 * 60), snapshot: snap, configuration: configuration) }
+        return Timeline(entries: entries, policy: .after(entries[entries.count - 1].date))
     }
 }
 
@@ -72,8 +75,10 @@ private struct FreshnessCaption: View {
             Text("estimated").font(.system(size: 10)).foregroundStyle(.orange)
         } else if now.timeIntervalSince(snapshot.updatedAt) > Self.staleAfter {
             Text("Stale · updated \(time)").font(.system(size: 10)).foregroundStyle(.orange)
+        } else if snapshot.refreshError != nil {
+            Text("Couldn't refresh · updated \(time)").font(.system(size: 10)).foregroundStyle(.orange)
         } else {
-            Text("Updated \(snapshot.updatedAt.formatted(date: .omitted, time: .shortened))")
+            Text("Updated \(time)")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
         }
     }

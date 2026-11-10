@@ -27,9 +27,12 @@ final class UsageService: ObservableObject {
     private var isRefreshing = false
     private var lastFetchSuccess: Date?
     private var failures = 0
+    /// Consecutive HTTP 429s; while `blockedUntil` is in the future the API is not called at all.
+    private var rateLimitStreak = 0
+    private var blockedUntil: Date?
     private var wakeRetry: Task<Void, Never>?
     private var lockedRetry: Task<Void, Never>?
-    private static let wakeDelays: [Double] = [3, 7, 20, 30, 60]   // cumulative +3s, +10s, +30s, +60s, +120s
+    private static let wakeDelays: [Double] = [8, 22, 60]   // cumulative +8s, +30s, +90s
     private static let lockedRetrySeconds = 60.0
     private var lastWritten: SharedSnapshot?
     private var lastReload: Date?
@@ -64,7 +67,8 @@ final class UsageService: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh()
-                let secs = self.currentInterval()
+                var secs = self.currentInterval()
+                if let b = self.blockedUntil, b > Date() { secs = max(secs, Int(b.timeIntervalSinceNow.rounded(.up)) + 1) }
                 self.nextRefresh = Date().addingTimeInterval(Double(secs))
                 try? await Task.sleep(for: .seconds(secs))
             }
@@ -76,6 +80,19 @@ final class UsageService: ObservableObject {
         let base = max(Self.minPoll, settings.prefs.pollSeconds)
         guard failures > 0 else { return base }
         return min(max(base, Self.maxBackoff), base << min(failures, 10))
+    }
+
+    private var isBlocked: Bool { blockedUntil.map { Date() < $0 } ?? false }
+
+    /// Backs off after an HTTP 429; the generic failure counter is left alone.
+    private func noteRateLimited(retryAfter: TimeInterval?) {
+        rateLimitStreak += 1
+        blockedUntil = Date().addingTimeInterval(RateLimitBackoff.delay(consecutive429: rateLimitStreak, retryAfter: retryAfter))
+    }
+
+    private func blockedMessage() -> String? {
+        guard let b = blockedUntil else { return nil }
+        return LimitsError.rateLimited(retryAfter: max(0, b.timeIntervalSinceNow)).errorDescription
     }
 
     /// User-initiated refresh (button): may show a Keychain dialog if needed.
@@ -96,6 +113,7 @@ final class UsageService: ObservableObject {
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled, let self else { return }
                 await self.refresh()
+                if self.isBlocked { break }   // rate limited: stop hammering the API
                 if self.error == nil, self.limits?.isEstimated == false { break }
             }
             self?.failures = 0
@@ -132,16 +150,25 @@ final class UsageService: ObservableObject {
 
         var snap: LimitsSnapshot
         var fetched = false
-        if let t = lastFetchSuccess, now.timeIntervalSince(t) < Self.fetchCooldown, let l = limits, !l.isEstimated {
+        if isBlocked {
+            self.error = blockedMessage()   // rate limited: no network call, keep the last real data
+            if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
+        } else if let t = lastFetchSuccess, now.timeIntervalSince(t) < Self.fetchCooldown, let l = limits, !l.isEstimated {
             snap = l   // fetched very recently; just rescan logs
         } else {
             do {
                 snap = try await client.fetch()
                 error = nil
                 failures = 0
+                rateLimitStreak = 0
+                blockedUntil = nil
                 fetched = true
                 lastFetchSuccess = Date()
                 await ingestor.record(snap)
+            } catch let LimitsError.rateLimited(retryAfter) {
+                noteRateLimited(retryAfter: retryAfter)
+                self.error = blockedMessage()
+                if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
             } catch {
                 self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 if (error as? LimitsError) == .keychainLocked { scheduleLockedRetry() } else { failures += 1 }
@@ -149,7 +176,7 @@ final class UsageService: ObservableObject {
                 if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
             }
         }
-        if fetched { await refreshPlanIfNeeded() }
+        if fetched, !isBlocked { await refreshPlanIfNeeded() }
         let now2 = Date()   // the fetch may have blocked on a Keychain prompt for a long time
         let hist2 = await ingestor.current()
         let sum = Aggregator.summarize(hist2, prices: prefs.prices, now: now2)
@@ -165,25 +192,32 @@ final class UsageService: ObservableObject {
         if let d = try? JSONEncoder().encode(fired) { UserDefaults.standard.set(d, forKey: Self.firedKey) }
 
         limits = snap; summary = sum; history = hist2
-        writeSnapshot(snap, sum, hist2, now2)
+        writeSnapshot(snap, sum, hist2, now2, refreshError: snap.isEstimated ? nil : self.error)
         if fetched, !snap.isEstimated { await WidgetWatchdogRunner.check(groupID: groupID) }
     }
 
     /// Silent on failure: keeps the previous plan and retries on a later successful poll.
     private func refreshPlanIfNeeded() async {
         if plan != nil, let t = planFetchedAt, Date().timeIntervalSince(t) < Self.planMaxAge { return }
-        guard let planClient, let p = try? await planClient.fetchPlan() else { return }
-        plan = p; planFetchedAt = Date()
+        guard let planClient else { return }
+        do {
+            plan = try await planClient.fetchPlan(); planFetchedAt = Date()
+        } catch LimitsError.rateLimited(let after) {
+            noteRateLimited(retryAfter: after)   // the usage data is fresh, so no error is shown; the next fetches wait
+        } catch {}
     }
 
     func daily(days: Int) -> [DailyPoint] {
         Aggregator.daily(history, prices: settings.prefs.prices, days: days, now: Date())
     }
 
-    private func writeSnapshot(_ l: LimitsSnapshot, _ s: UsageSummary, _ h: HistoryData, _ now: Date) {
+    private func writeSnapshot(_ l: LimitsSnapshot, _ s: UsageSummary, _ h: HistoryData, _ now: Date,
+                               refreshError: String? = nil) {
+        // A kept last-known snapshot keeps its own age, so widgets don't look freshly updated after a failed refresh.
         let snap = SharedSnapshot(limits: l, today: s.today, last7: s.last7,
-                                  daily: Aggregator.daily(h, prices: settings.prefs.prices, days: 7, now: now), updatedAt: now,
-                                  showRemaining: settings.prefs.showRemaining)
+                                  daily: Aggregator.daily(h, prices: settings.prefs.prices, days: 7, now: now),
+                                  updatedAt: refreshError == nil ? now : l.fetchedAt,
+                                  showRemaining: settings.prefs.showRemaining, refreshError: refreshError)
         let url = SharedSnapshot.groupURL(groupID: groupID)
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("ClaudeUsageWidget/snapshot.json")

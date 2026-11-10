@@ -3,6 +3,7 @@ import Security
 
 public enum LimitsError: Error, Equatable, LocalizedError {
     case noToken, unauthorized, http(Int), badResponse, timeout, keychainBusy, keychainLocked
+    case rateLimited(retryAfter: TimeInterval?)
     public var errorDescription: String? {
         switch self {
         case .noToken: return "No Claude Code login found in Keychain"
@@ -12,6 +13,9 @@ public enum LimitsError: Error, Equatable, LocalizedError {
         case .timeout: return "Timed out waiting for Keychain/usage API"
         case .keychainBusy: return "Waiting for Keychain access — approve the prompt"
         case .keychainLocked: return "Keychain is locked — unlock it to refresh"
+        case .rateLimited(let after):
+            guard let after else { return "Rate limited by Anthropic — retrying shortly" }
+            return "Rate limited by Anthropic — retrying in \(max(1, Int((after / 60).rounded(.up)))) min"
         }
     }
 }
@@ -236,6 +240,29 @@ public struct KeychainTokenProvider: TokenProviding {
     }
 }
 
+/// Parses a `Retry-After` header (delta-seconds or an HTTP-date) into seconds from `now`, clamped to 0...3600.
+public enum RetryAfter {
+    public static func parse(_ value: String?, now: Date = Date()) -> TimeInterval? {
+        guard let v = value?.trimmingCharacters(in: .whitespaces), !v.isEmpty else { return nil }
+        if let secs = Double(v), secs.isFinite { return min(3600, max(0, secs)) }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "GMT")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        guard let d = f.date(from: v) else { return nil }
+        return min(3600, max(0, d.timeIntervalSince(now)))
+    }
+}
+
+/// How long to stay off the API after consecutive HTTP 429s: exponential from 2 minutes, at least the server's
+/// `Retry-After`, capped at 30 minutes.
+public enum RateLimitBackoff {
+    public static func delay(consecutive429: Int, retryAfter: TimeInterval?) -> TimeInterval {
+        let exp = min(max(consecutive429, 1) - 1, 10)
+        return min(1800, max(retryAfter ?? 0, 120 * pow(2, Double(exp))))
+    }
+}
+
 public protocol PlanProviding: Sendable { func fetchPlan() async throws -> PlanInfo }
 
 public struct OAuthLimitsClient: LimitsProviding, PlanProviding {
@@ -303,6 +330,7 @@ public struct OAuthLimitsClient: LimitsProviding, PlanProviding {
         switch resp.statusCode {
         case 200: return try decode(data)
         case 401, 403: tokens.invalidate(); throw LimitsError.unauthorized
+        case 429: throw LimitsError.rateLimited(retryAfter: RetryAfter.parse(resp.value(forHTTPHeaderField: "Retry-After")))
         default: throw LimitsError.http(resp.statusCode)
         }
     }

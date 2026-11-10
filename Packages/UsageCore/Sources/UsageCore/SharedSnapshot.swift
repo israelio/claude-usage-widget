@@ -8,8 +8,11 @@ public struct SharedSnapshot: Codable, Equatable, Sendable {
     public var updatedAt: Date
     /// App preference: show remaining instead of used. Optional so older snapshot files still decode.
     public var showRemaining: Bool?
-    public init(limits: LimitsSnapshot?, today: Totals, last7: Totals, daily: [DailyPoint], updatedAt: Date, showRemaining: Bool? = nil) {
-        self.showRemaining = showRemaining; self.limits = limits; self.today = today; self.last7 = last7; self.daily = daily; self.updatedAt = updatedAt
+    /// Set when the last refresh failed and `limits` is the last known real snapshot. Optional for older files.
+    public var refreshError: String?
+    public init(limits: LimitsSnapshot?, today: Totals, last7: Totals, daily: [DailyPoint], updatedAt: Date, showRemaining: Bool? = nil,
+                refreshError: String? = nil) {
+        self.refreshError = refreshError; self.showRemaining = showRemaining; self.limits = limits; self.today = today; self.last7 = last7; self.daily = daily; self.updatedAt = updatedAt
     }
 
     public func save(to url: URL) throws {
@@ -41,7 +44,8 @@ public struct SharedSnapshot: Codable, Equatable, Sendable {
         }
         func tot(_ t: Totals) -> String { "\(Int((t.cost * 100).rounded()))" }
         var k = [win(limits?.fiveHour), win(limits?.sevenDay), limits == nil ? "nolimits" : "limits",
-                 limits?.isEstimated == true ? "est" : "real", tot(today), tot(last7), showRemaining == true ? "left" : "used"]
+                 limits?.isEstimated == true ? "est" : "real", tot(today), tot(last7), showRemaining == true ? "left" : "used",
+                 refreshError == nil ? "ok" : "refresh-error"]
         k += (limits?.extra ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\(win($0.value))" }
         k += daily.map { "\(Int($0.day.timeIntervalSince1970)):\(Int(($0.cost * 100).rounded()))" }
         return k
