@@ -22,6 +22,9 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
       <br><br>
       <img src="docs/images/usage-models.png" alt="Usage window grouped by model: models ranked by cost, with an expanded model listing the projects that used it and a daily cost chart" width="640"><br>
       <sub>Grouped by model: which projects used each model</sub>
+      <br><br>
+      <img src="docs/images/usage-sessions.png" alt="Usage window in Sessions mode: one bar per 5-hour work session over the last 7 days, with projects ranked by cost and an expanded project showing a cost-per-session chart" width="640"><br>
+      <sub>Sessions mode: Claude's rolling 5-hour work windows instead of days</sub>
     </td>
   </tr>
 </table>
@@ -72,7 +75,7 @@ More:
 - **Offline fallback** — if the usage endpoint or Keychain is unavailable, usage is estimated from your local logs and marked as estimated. The last real values are kept and shown as stale rather than replaced.
 - **Light and dark** — follows your system appearance with a glass material.
 
-## What's new in v0.1.11 (unreleased)
+## What's new in v0.1.11
 
 - **Sessions in the Usage window.** Claude's limits use rolling 5-hour windows that start at your first message, so the Usage window can now show those work sessions as well as days. Switch **Days | Sessions** in the top bar: the chart shows one bar per session (cost or tokens), you can step through sessions, jump to a date, or aggregate the sessions of the last 3, 7, 14 or 30 days, and the project and model tables (with an hourly or per-session trend) and a new **Sessions** CSV export follow the selection. Retention caveat: hourly detail is built once from the logs Claude Code still keeps and then accumulates, so sessions only go back as far as that; the window says so when a range reaches earlier.
 
