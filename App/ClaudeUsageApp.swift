@@ -78,7 +78,15 @@ private struct LabelHost: View {
                 // Developer conveniences (README screenshots / checks):
                 //   --show-history           opens History as the panel's button does (glued to the panel if visible)
                 //   --show-history-menubar   opens History as the menu bar popover's button does (free-standing)
+                //   --show-projects[=-N]     opens "Usage by Project" free-standing for 30d (or for the day N days ago)
                 let args = CommandLine.arguments
+                if let a = args.first(where: { $0.hasPrefix("--show-projects") }) {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    ProjectsWindowController.shared.configure(service: service)
+                    var day: Date? = nil
+                    if let n = Int(a.dropFirst("--show-projects=".count)), a.contains("=") { day = Calendar.current.date(byAdding: .day, value: -abs(n), to: Date()) }
+                    ProjectsWindowController.shared.show(day: day, attachTo: nil)
+                }
                 if args.contains("--show-history") || args.contains("--show-history-menubar") {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the pinned panel appear first
                     HistoryWindowController.shared.configure(service: service)
