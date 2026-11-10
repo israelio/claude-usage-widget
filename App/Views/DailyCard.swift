@@ -5,6 +5,8 @@ import UsageCore
 struct DailyCard: View {
     @Environment(\.compact) private var compact
     @ObservedObject var service: UsageService
+    /// Called with the day of a clicked bar (opens the per-project breakdown).
+    var openProjects: (Date?) -> Void = { _ in }
     @State private var range = 7
     @State private var selected: Date?
     @AppStorage("dailyChartMetric") private var metric = "cost"
@@ -47,15 +49,41 @@ struct DailyCard: View {
                                         Text("In \(Format.tokens(h.tokens.input)) · Out \(Format.tokens(h.tokens.output)) · Cache \(Format.tokens(h.tokens.cache))")
                                             .foregroundStyle(.secondary)
                                     }
+                                    Text("Click for project breakdown").foregroundStyle(.secondary)
                                 }
                             }
                         }
                 }
             }
-            .chartXSelection(value: $selected)
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let loc):
+                                selected = day(at: loc, proxy: proxy, geo: geo, in: data)
+                                if selected != nil { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
+                            case .ended:
+                                selected = nil
+                                NSCursor.arrow.set()
+                            }
+                        }
+                        .onTapGesture { loc in
+                            if let d = day(at: loc, proxy: proxy, geo: geo, in: data) { openProjects(d) }
+                        }
+                }
+            }
             .chartYAxis { AxisMarks(values: .automatic(desiredCount: compact ? 2 : 4)) { v in AxisValueLabel { Text(axisLabel(v.as(Double.self) ?? 0)).font(.system(size: 9)) } } }
             .frame(height: compact ? 56 : 90)
             .padding(.top, 4)
         }
+    }
+
+    /// The chart's day under `location` (an overlay coordinate), or nil when it is outside the plot or off any day.
+    private func day(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy, in data: [DailyPoint]) -> Date? {
+        guard let frame = proxy.plotFrame else { return nil }
+        let x = location.x - geo[frame].origin.x
+        guard x >= 0, x <= geo[frame].width, let date: Date = proxy.value(atX: x) else { return nil }
+        return data.first { Calendar.current.isDate($0.day, inSameDayAs: date) }?.day
     }
 }

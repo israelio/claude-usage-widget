@@ -276,6 +276,10 @@ final class UsageService: ObservableObject {
         Aggregator.daily(history, prices: settings.prefs.prices, days: days, now: Date())
     }
 
+    func byProject(range: ProjectRange) -> ProjectBreakdown {
+        Aggregator.byProject(history, prices: settings.prefs.prices, range: range, now: Date())
+    }
+
     private func writeSnapshot(_ l: LimitsSnapshot, _ s: UsageSummary, _ h: HistoryData, _ now: Date,
                                refreshError: String? = nil) {
         // A kept last-known snapshot keeps its own age, so widgets don't look freshly updated after a failed refresh

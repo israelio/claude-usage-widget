@@ -209,5 +209,6 @@ final class ProjectTests: XCTestCase {
         XCTAssertEqual(b.other?.tokens.total, b.tail.reduce(0) { $0 + $1.tokens.total })
         XCTAssertTrue(ProjectCSV.make(b).contains("\"a,b\","))
         XCTAssertNil(b.earlier)
+        XCTAssertEqual(b.sorted(byTokens: true).rows.first?.name, "proj10")
     }
 }

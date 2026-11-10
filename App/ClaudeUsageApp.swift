@@ -27,6 +27,7 @@ struct ClaudeUsageApp: App {
                     // Hand the panel the app's real (installed) service; creating one in init() would be a separate copy.
                     PanelController.shared.configure(service: service, settings: settings)
                     HistoryWindowController.shared.configure(service: service)
+                    ProjectsWindowController.shared.configure(service: service)
                     service.start(); Updater.shared.start(); syncPanel()
                 }   // start() also performs the first refresh
         }
@@ -49,7 +50,8 @@ private struct MenuBarPopover: View {
     var body: some View {
         PopoverView(service: service,
                     openHistory: { HistoryWindowController.shared.show() },
-                    openSettings: { NSApp.activate(ignoringOtherApps: true); openSettings() })
+                    openSettings: { NSApp.activate(ignoringOtherApps: true); openSettings() },
+                    openProjects: { ProjectsWindowController.shared.show(day: $0, attachTo: nil) })
     }
 }
 

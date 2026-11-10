@@ -16,6 +16,8 @@ struct PopoverView: View {
     @ObservedObject var service: UsageService
     var openHistory: () -> Void
     var openSettings: () -> Void
+    /// Opens the per-project breakdown, for the clicked day on the Daily Usage chart.
+    var openProjects: (Date?) -> Void = { _ in }
     /// Fixed height for the menu bar popover; nil lets the content fill its container (the resizable floating panel).
     var panelHeight: CGFloat? = PopoverView.preferredHeight
     /// Reports the height the content wants (used by the floating panel to size itself to its content).
@@ -53,7 +55,7 @@ struct PopoverView: View {
                 } else {
                     ProgressView().padding()
                 }
-                DailyCard(service: service)
+                DailyCard(service: service, openProjects: openProjects)
                 TokenCard(summary: service.summary)
                 if let p = service.plan { PlanCard(plan: p, extraUsage: service.limits?.extraUsage) }
                 if !compact { GlassCard {

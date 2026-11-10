@@ -30,6 +30,7 @@ final class PanelController {
                     NSApp.activate(ignoringOtherApps: true)
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 },
+                openProjects: { [weak self] day in ProjectsWindowController.shared.show(day: day, attachTo: self?.visiblePanel) },
                 panelHeight: nil,
                 onContentHeight: { [weak self] h in Task { @MainActor in self?.fitToContent(h) } }),
                 onClose: { Task { @MainActor in settings.prefs.floatingPanel = false } })

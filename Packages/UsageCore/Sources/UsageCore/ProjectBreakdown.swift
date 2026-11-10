@@ -31,6 +31,14 @@ public struct ProjectBreakdown: Equatable, Sendable {
     public var earlier: ProjectRow?
     public var total: Totals
 
+    /// The same breakdown with `rows` ordered by tokens instead of cost (so `top` / `tail` follow that order).
+    public func sorted(byTokens: Bool) -> ProjectBreakdown {
+        guard byTokens else { return self }
+        var b = self
+        b.rows.sort { $0.tokens.total != $1.tokens.total ? $0.tokens.total > $1.tokens.total : $0.name < $1.name }
+        return b
+    }
+
     /// The rows to show before the long tail: all of them when there are `maxVisible` or fewer.
     public var top: [ProjectRow] { rows.count > Self.maxVisible ? Array(rows.prefix(Self.maxVisible)) : rows }
     /// The grouped long tail (so the UI can expand "Other (N)").

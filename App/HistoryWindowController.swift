@@ -14,7 +14,6 @@ final class HistoryWindowController {
     private var window: NSWindow?
     private var service: UsageService?
     private var closeObserver: NSObjectProtocol?
-    private let gap: CGFloat = 12
 
     func configure(service: UsageService) { self.service = service }
 
@@ -35,7 +34,7 @@ final class HistoryWindowController {
         }
         guard let window else { return }
         if let panel, panel.isVisible {
-            attach(window, to: panel)
+            WindowPlacement.attach(window, to: panel)
         } else {
             detach()
             if !window.isVisible { window.center() }
@@ -44,23 +43,8 @@ final class HistoryWindowController {
         window.makeKeyAndOrderFront(nil)
     }
 
-    private func detach() {
-        guard let window else { return }
-        window.parent?.removeChildWindow(window)
-        window.level = .normal
-    }
+    /// The window while it is open (so a sibling window can be placed next to it).
+    var visibleWindow: NSWindow? { window?.isVisible == true ? window : nil }
 
-    private func attach(_ w: NSWindow, to panel: NSWindow) {
-        if w.parent !== panel {
-            w.parent?.removeChildWindow(w)
-            panel.addChildWindow(w, ordered: .above)
-        }
-        w.level = panel.level
-        let area = (panel.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
-        var origin = NSPoint(x: panel.frame.maxX + gap, y: panel.frame.maxY - w.frame.height)
-        if origin.x + w.frame.width > area.maxX { origin.x = panel.frame.minX - gap - w.frame.width }
-        origin.x = max(area.minX, origin.x)
-        origin.y = max(area.minY, origin.y)
-        w.setFrameOrigin(origin)
-    }
+    private func detach() { if let window { WindowPlacement.detach(window) } }
 }
