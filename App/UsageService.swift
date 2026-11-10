@@ -283,6 +283,14 @@ final class UsageService: ObservableObject {
         return f.date(from: k)
     }
 
+    /// Every 5-hour session in the hourly history, oldest first.
+    var sessions: [UsageSession] { SessionBuilder.sessions(hourly: history.hourly) }
+
+    /// The start of the earliest hour with hourly detail (sessions exist only from there on).
+    var earliestHour: Date? {
+        history.hourly.keys.min().map { Date(timeIntervalSince1970: Double($0) * 3600) }
+    }
+
     func byProject(range: ProjectRange) -> ProjectBreakdown {
         Aggregator.byProject(history, prices: settings.prefs.prices, range: range, now: Date())
     }

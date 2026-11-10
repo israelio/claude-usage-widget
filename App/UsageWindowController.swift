@@ -21,9 +21,13 @@ final class UsageWindowController {
 
     /// - day: the bar that was clicked (the window opens on that day), or nil for the last `days` days.
     /// - attachTo: the floating panel to glue the window to, or nil for a free-standing window.
-    func show(day: Date?, days: Int = 30, attachTo panel: NSWindow? = nil) {
+    /// - sessions: open in Sessions granularity (7 days); nil follows the saved granularity; the developer env
+    ///   `CLAUDEUSAGE_USAGE_GRANULARITY=sessions|days` overrides both. A clicked day always opens Days mode on that day.
+    func show(day: Date?, days: Int = 30, sessions: Bool? = nil, attachTo panel: NSWindow? = nil) {
         guard let service else { return }
-        model.open(day: day, days: days)
+        let env = ProcessInfo.processInfo.environment["CLAUDEUSAGE_USAGE_GRANULARITY"]
+        let wantSessions = env.map { $0 == "sessions" } ?? sessions ?? (UserDefaults.standard.string(forKey: "usageGranularity") == "sessions")
+        model.open(day: day, days: days, sessions: wantSessions)
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable],

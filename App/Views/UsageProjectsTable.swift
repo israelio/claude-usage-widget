@@ -10,6 +10,8 @@ struct UsageProjectsTable: View {
     let showCost: Bool
     let day: Date?
     let span: UsageSpan
+    /// What one trend point is (days; hours of a session; sessions).
+    var unit: TrendUnit = .day
     @State private var expanded = Set<String>()
     @State private var otherOpen = false
 
@@ -139,9 +141,9 @@ struct UsageProjectsTable: View {
             }
             let pts = trend(r)
             if !pts.isEmpty {
-                Text((showCost ? "Daily cost (USD)" : "Daily tokens") + (context != nil ? " — last 7 days" : ""))
+                Text(unit.caption(showCost: showCost) + (context != nil ? " — last 7 days" : ""))
                     .foregroundStyle(.secondary).padding(.top, 4)
-                UsageTrendChart(points: pts, showCost: showCost, highlight: day)
+                UsageTrendChart(points: pts, showCost: showCost, highlight: day, unit: unit)
             }
         }
         .font(.system(size: 11))
