@@ -17,8 +17,11 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
       <sub>The panel: limits, pace, daily usage, tokens and plan</sub>
     </td>
     <td valign="top" align="center">
-      <img src="docs/images/projects.png" alt="Usage window: 90-day daily chart on top, projects ranked by cost with share bars below, and an expanded project showing its model split and a daily cost chart" width="640"><br>
-      <sub>The Usage window: click a bar on Daily Usage (or the footer button). Group by project or model; each row expands to its breakdown and daily trend (project names here are placeholders)</sub>
+      <img src="docs/images/usage-projects.png" alt="Usage window grouped by project: 90-day daily chart on top, projects ranked by cost with share bars, and an expanded project showing its model split and a daily cost chart" width="640"><br>
+      <sub>The Usage window, grouped by project: click a bar on Daily Usage (or the footer button). Each project expands to its model split and daily trend (project names here are placeholders)</sub>
+      <br><br>
+      <img src="docs/images/usage-models.png" alt="Usage window grouped by model: models ranked by cost, with an expanded model listing the projects that used it and a daily cost chart" width="640"><br>
+      <sub>Grouped by model: which projects used each model</sub>
     </td>
   </tr>
 </table>
