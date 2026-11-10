@@ -80,7 +80,7 @@ More:
   - *Reset notice*: your window reset and usage is available again.
   - *Digests*: a daily summary and a Monday weekly summary of tokens and cost, at an hour you choose.
   - *Quiet hours*: suppress alerts overnight.
-- **Desktop widgets** — small (session ring), medium (session + weekly + today's cost) and large (adds weekly Fable and a 7-day chart). They need a build signed with your Apple Team ID (see below).
+- **Desktop widgets** — small (session ring), medium (session + weekly + today's cost) and large (adds weekly Fable and a 7-day chart). They need a build signed with your Apple Team ID (see below). macOS only lets you add widgets yourself, so the app offers a step-by-step guide on first launch and under Settings → Desktop widgets (with a live "widgets on your desktop" status and shortcuts to the widget style setting and a refresh).
 - **Settings** — refresh interval, menu bar mode, notification options, fallback token budgets, and the per-model price table.
 - **Offline fallback** — if the usage endpoint or Keychain is unavailable, usage is estimated from your local logs and marked as estimated. The last real values are kept and shown as stale rather than replaced.
 - **Light and dark** — follows your system appearance with a glass material.
@@ -121,7 +121,7 @@ Start it with `open -a "Claude Usage"` or from the Applications folder or Launch
 3. Launch it. Releases from 0.1.1 on are signed with a Developer ID and notarized by Apple, so it opens normally. (The older 0.1.0 was unsigned: right-click → **Open**.)
 4. The app reads your Claude Code login from the Keychain through Apple's `security` tool, normally without a prompt. If macOS does ask, choose **Always Allow** ([details](#keychain-access)).
 5. Look for the usage label in your menu bar. Click it to open the panel.
-6. For the desktop widgets: right-click the desktop → **Edit Widgets** → search "Claude Usage".
+6. For the desktop widgets: on first launch the app offers a short guide (also under Settings → Desktop widgets). macOS doesn't let apps place widgets for you, so right-click the desktop → **Edit Widgets** → search "Claude Usage".
 
 ## Updates
 

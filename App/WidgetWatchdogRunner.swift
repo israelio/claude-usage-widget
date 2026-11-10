@@ -21,9 +21,7 @@ enum WidgetWatchdogRunner {
         guard !running else { return }
         running = true
         defer { running = false }
-        let configs: [WidgetInfo] = await withCheckedContinuation { c in
-            WidgetCenter.shared.getCurrentConfigurations { c.resume(returning: (try? $0.get()) ?? []) }   // error: treat as no widgets
-        }
+        let configs = await WidgetConfigurations.current() ?? []   // error: treat as no widgets
         let beat = WidgetHeartbeat.url(groupID: groupID).flatMap { WidgetHeartbeat.read(from: $0) }
         let t = thresholds
         let now = Date()

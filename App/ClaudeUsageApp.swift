@@ -12,6 +12,7 @@ struct ClaudeUsageApp: App {
         UserDefaults.standard.set(100, forKey: "NSInitialToolTipDelay")
         // Older versions used a SwiftUI "history" window scene; its saved-window entry makes that window reappear.
         UserDefaults.standard.removeObject(forKey: "NSWindow Frame history")
+        WidgetOnboarding.captureFreshInstall()   // must run before AppSettings() creates prefs
         let s = AppSettings()
         _settings = StateObject(wrappedValue: s)
         _service = StateObject(wrappedValue: UsageService(settings: s))
@@ -28,6 +29,7 @@ struct ClaudeUsageApp: App {
                     PanelController.shared.configure(service: service, settings: settings)
                     UsageWindowController.shared.configure(service: service)
                     service.start(); Updater.shared.start(); syncPanel()
+                    WidgetOnboarding.offerIfFresh()
                 }   // start() also performs the first refresh
         }
         .menuBarExtraStyle(.window)
@@ -78,6 +80,7 @@ private struct LabelHost: View {
                 //   --show-history-menubar   for 90 days, as the menu bar popover's button does (free-standing)
                 //   --show-projects[=-N]     free-standing for 30 days (or for the day N days ago)
                 //   --show-sessions          free-standing in Sessions granularity (7 days)
+                //   --show-widget-guide      opens the desktop widget guide window (first-run mode)
                 //   CLAUDEUSAGE_PROJECTS_EXPAND=N  (env var) expands the first N rows in that window on appear
                 //                            (99 also expands the "Other" project group)
                 //   CLAUDEUSAGE_ANONYMIZE_PROJECTS=1  (env var) shows placeholder project names
@@ -90,6 +93,10 @@ private struct LabelHost: View {
                     var day: Date? = nil
                     if let n = Int(a.dropFirst("--show-projects=".count)), a.contains("=") { day = Calendar.current.date(byAdding: .day, value: -abs(n), to: Date()) }
                     UsageWindowController.shared.show(day: day, sessions: false, attachTo: nil)
+                }
+                if args.contains("--show-widget-guide") {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    WidgetGuideWindowController.shared.show(firstRun: true)
                 }
                 if args.contains("--show-sessions") {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)

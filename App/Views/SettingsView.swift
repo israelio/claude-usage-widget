@@ -1,10 +1,12 @@
 import SwiftUI
 import UsageCore
+import WidgetKit
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @State private var thresholdText = ""
     @FocusState private var thresholdFocused: Bool
+    @StateObject private var widgetStatus = WidgetStatus()
 
     var body: some View {
         Form {
@@ -53,6 +55,22 @@ struct SettingsView: View {
                     .onSubmit(commitThresholds)
                     .onChange(of: thresholdFocused) { _, f in if !f { commitThresholds() } }
             }
+            Section("Desktop widgets") {
+                LabeledContent("Status") {
+                    switch widgetStatus.placedCount {
+                    case .none: Text("Checking…").foregroundStyle(.secondary)
+                    case .some(0): Text("None added yet").foregroundStyle(.secondary)
+                    case .some(let n): Text("\(n) widget\(n == 1 ? "" : "s") on your desktop").foregroundStyle(.green)
+                    }
+                }
+                HStack {
+                    Button("How to add widgets…") { WidgetGuideWindowController.shared.show(firstRun: false) }
+                    Button("Widget style (Full-color / Monochrome)…") { DesktopSettingsLink.open() }
+                    Button("Refresh widgets") { WidgetCenter.shared.reloadAllTimelines() }
+                }
+                Text("macOS doesn't let apps place widgets for you; Edit Widgets on the desktop does.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Updates") {
                 Toggle("Install updates automatically", isOn: $settings.prefs.autoUpdate)
                 Text("Checks GitHub for new releases every 6 hours.").font(.caption).foregroundStyle(.secondary)
@@ -74,9 +92,9 @@ struct SettingsView: View {
                 Button("Reset to defaults") { settings.prefs.prices = .defaults }
             }
         }
-        .formStyle(.grouped).frame(width: 560, height: 620)
-        .onAppear { thresholdText = Self.format(settings.prefs.alerts.thresholds) }
-        .onDisappear(perform: commitThresholds)
+        .formStyle(.grouped).frame(width: 560, height: 700)
+        .onAppear { thresholdText = Self.format(settings.prefs.alerts.thresholds); widgetStatus.start() }
+        .onDisappear { commitThresholds(); widgetStatus.stop() }
     }
 
     /// Sample data so the effect of each toggle is visible without waiting for real numbers.
