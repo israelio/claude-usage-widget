@@ -15,6 +15,6 @@ public enum LogParser {
         let id = mid + ":" + ((obj["requestId"] as? String) ?? "")
         let tokens = TokenCounts(input: n("input_tokens"), output: n("output_tokens"),
                                  cacheWrite: n("cache_creation_input_tokens"), cacheRead: n("cache_read_input_tokens"))
-        return UsageRecord(id: id, timestamp: date, model: model, tokens: tokens)
+        return UsageRecord(id: id, timestamp: date, model: model, tokens: tokens, cwd: obj["cwd"] as? String)
     }
 }

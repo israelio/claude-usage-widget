@@ -5,11 +5,13 @@ public actor UsageIngestor {
     private var scanner: LogScanner?
     private let logsRoot: URL
     private let storeURL: URL
+    private let resolver: ProjectResolver
     private var lastNewCount = 0
 
-    public init(logsRoot: URL, storeURL: URL) {
+    public init(logsRoot: URL, storeURL: URL, resolver: ProjectResolver = DefaultProjectResolver()) {
         self.logsRoot = logsRoot
         self.storeURL = storeURL
+        self.resolver = resolver
     }
 
     /// Loads history from disk on first use (inside the actor, off the main thread).
@@ -25,15 +27,31 @@ public actor UsageIngestor {
     /// Scans new log lines, rolls them up, prunes, persists only if something changed, returns a copy.
     public func refreshLogs(now: Date = Date()) -> HistoryData {
         let scanner = ensureLoaded()
-        let new = scanner.scan(now: now)
+        var changed = backfillProjectsIfNeeded(now: now)
+        var new = scanner.scan(now: now)
+        for i in new.indices { new[i].project = resolver.resolve(cwd: new[i].cwd).root }
         lastNewCount = new.count
-        var changed = !new.isEmpty
+        if !new.isEmpty { changed = true }
         history.add(new)
         if history.scan != scanner.state { history.scan = scanner.state; changed = true }
         if history.prune(now: now) { changed = true }
         // Keep the scanner's view in sync with pruned `seen`.
         if changed { scanner.state = history.scan; save() }
         return history
+    }
+
+    /// One-off: rebuilds `projectDays` from all log files still on disk, with a throwaway scanner (own `seen` set).
+    /// Only records already counted in `days` (present in the real scanner's `seen`) are used, so anything newer is
+    /// left for the regular incremental scan and nothing is counted twice. Touches nothing but `projectDays`.
+    private func backfillProjectsIfNeeded(now: Date) -> Bool {
+        guard history.projectSchemaVersion < 1 else { return false }
+        var records = LogScanner(root: logsRoot, state: ScanState()).scan(now: now)
+            .filter { history.scan.seen[$0.id] != nil }
+        for i in records.indices { records[i].project = resolver.resolve(cwd: records[i].cwd).root }
+        history.projectDays = [:]
+        history.addProjects(records)
+        history.projectSchemaVersion = 1
+        return true
     }
 
     /// How many new log records the latest `refreshLogs` found.

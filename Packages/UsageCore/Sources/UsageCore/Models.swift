@@ -23,8 +23,24 @@ public struct UsageRecord: Codable, Equatable, Sendable {
     public var timestamp: Date
     public var model: String
     public var tokens: TokenCounts
-    public init(id: String, timestamp: Date, model: String, tokens: TokenCounts) {
+    /// Working directory the log line was written from. Transient: only used to resolve `project`, never persisted.
+    public var cwd: String?
+    /// Resolved project root path (or "Unknown"); nil for records persisted before per-project tracking.
+    public var project: String?
+    public init(id: String, timestamp: Date, model: String, tokens: TokenCounts, cwd: String? = nil, project: String? = nil) {
         self.id = id; self.timestamp = timestamp; self.model = model; self.tokens = tokens
+        self.cwd = cwd; self.project = project
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, timestamp, model, tokens, project }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        model = try c.decode(String.self, forKey: .model)
+        tokens = try c.decode(TokenCounts.self, forKey: .tokens)
+        project = try c.decodeIfPresent(String.self, forKey: .project)
+        cwd = nil
     }
 }
 

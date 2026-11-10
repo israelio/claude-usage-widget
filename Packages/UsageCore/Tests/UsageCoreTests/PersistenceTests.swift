@@ -86,6 +86,9 @@ final class RobustnessTests: XCTestCase {
         let store = dir.appendingPathComponent("history.json")
         let ing = UsageIngestor(logsRoot: dir.appendingPathComponent("none"), storeURL: store)
         _ = await ing.refreshLogs(now: now)
+        // The first refresh persists the one-off project backfill marker; later idle refreshes must not write.
+        try? FileManager.default.removeItem(at: store)
+        _ = await ing.refreshLogs(now: now)
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.path))
         await ing.record(LimitsSnapshot(fetchedAt: now, fiveHour: LimitWindow(utilization: 1, resetsAt: nil)))
         XCTAssertTrue(FileManager.default.fileExists(atPath: store.path))
