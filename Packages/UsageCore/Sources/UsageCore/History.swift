@@ -32,9 +32,16 @@ public struct HistoryData: Codable, Equatable, Sendable {
     public var projectDays: [String: [String: [String: TokenCounts]]] = [:]
     /// 0 = per-project data not backfilled yet; 1 = `projectDays` covers everything in `days` that the logs still hold.
     public var projectSchemaVersion = 0
+    /// Epoch hour (floor(timestamp / 3600), UTC, so timezone independent) -> project root path (or "Unknown") -> model
+    /// -> tokens. One entry per active hour; the source for 5-hour session detection (see `SessionBuilder`).
+    public var hourly: [Int: [String: [String: TokenCounts]]] = [:]
+    /// 0 = `hourly` not backfilled yet; 1 = it covers everything in `days` that the logs still hold.
+    public var hourlySchemaVersion = 0
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case days, recent, samples, scan, projectDays, projectSchemaVersion }
+    public static func epochHour(_ date: Date) -> Int { Int((date.timeIntervalSince1970 / 3600).rounded(.down)) }
+
+    private enum CodingKeys: String, CodingKey { case days, recent, samples, scan, projectDays, projectSchemaVersion, hourly, hourlySchemaVersion }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         days = try c.decodeIfPresent([String: [String: TokenCounts]].self, forKey: .days) ?? [:]
@@ -43,6 +50,8 @@ public struct HistoryData: Codable, Equatable, Sendable {
         scan = try c.decodeIfPresent(ScanState.self, forKey: .scan) ?? ScanState()
         projectDays = (try? c.decodeIfPresent([String: [String: [String: TokenCounts]]].self, forKey: .projectDays)) ?? [:]
         projectSchemaVersion = (try? c.decodeIfPresent(Int.self, forKey: .projectSchemaVersion)) ?? 0
+        hourly = (try? c.decodeIfPresent([Int: [String: [String: TokenCounts]]].self, forKey: .hourly)) ?? [:]
+        hourlySchemaVersion = (try? c.decodeIfPresent(Int.self, forKey: .hourlySchemaVersion)) ?? 0
     }
 
     public mutating func add(_ records: [UsageRecord], calendar: Calendar = .current) {
@@ -53,6 +62,14 @@ public struct HistoryData: Codable, Equatable, Sendable {
         }
         // Before the backfill ran, only records that carry a project are tracked (the backfill covers the rest).
         addProjects(projectSchemaVersion >= 1 ? records : records.filter { $0.project != nil }, calendar: calendar)
+        addHourly(records)
+    }
+
+    /// Accumulates only `hourly` (nil project counts as "Unknown"). Used directly by the backfill.
+    public mutating func addHourly(_ records: [UsageRecord]) {
+        for r in records {
+            hourly[Self.epochHour(r.timestamp), default: [:]][r.project ?? ProjectNaming.unknown, default: [:]][r.model, default: .zero] += r.tokens
+        }
     }
 
     /// Accumulates only `projectDays` (nil project counts as "Unknown"). Used directly by the backfill.
@@ -68,16 +85,18 @@ public struct HistoryData: Codable, Equatable, Sendable {
     /// Returns true if anything was removed.
     @discardableResult
     public mutating func prune(now: Date, calendar: Calendar = .current) -> Bool {
-        let before = (days.count, recent.count, samples.count, projectDays.count)
+        let before = (days.count, recent.count, samples.count, projectDays.count, hourly.count)
         let dayCutoff = DayKey.string(calendar.date(byAdding: .day, value: -Self.keepDays, to: now)!, calendar: calendar)
         days = days.filter { $0.key >= dayCutoff }
         projectDays = projectDays.filter { $0.key >= dayCutoff }
+        let hourCutoff = Self.epochHour(now.addingTimeInterval(-Double(Self.keepDays) * 86400))
+        hourly = hourly.filter { $0.key >= hourCutoff }
         let weekAgo = now.addingTimeInterval(-7 * 86400)
         recent.removeAll { $0.timestamp < weekAgo }
         let sampleCutoff = now.addingTimeInterval(-8 * 86400)
         samples.removeAll { $0.t < sampleCutoff }
         let seenCutoff = DayKey.string(calendar.date(byAdding: .day, value: -Self.seenKeepDays, to: now)!, calendar: calendar)
         let seenRemoved = scan.pruneSeen(before: seenCutoff)
-        return seenRemoved || before != (days.count, recent.count, samples.count, projectDays.count)
+        return seenRemoved || before != (days.count, recent.count, samples.count, projectDays.count, hourly.count)
     }
 }

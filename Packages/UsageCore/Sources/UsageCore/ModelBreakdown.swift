@@ -65,11 +65,13 @@ public struct ModelBreakdown: Equatable, Sendable {
 
 extension Aggregator {
     /// Per-model cost and tokens over `range`, each model split by project. Project names and roots are the same as
-    /// in `byProject`. Usage in `days` that `projectDays` does not cover is listed under each model as "Earlier (unknown)".
+    /// in `byProject`. Usage in `days` that `projectDays` does not cover is listed under each model as "Earlier (unknown)" (day ranges only;
+    /// session ranges have none, and their trend points are hours or sessions, see `ProjectRange`).
     public static func byModel(_ h: HistoryData, prices: PriceTable, range: ProjectRange, now: Date,
                                calendar: Calendar = .current, home: String = NSHomeDirectory()) -> ModelBreakdown {
-        let dates = rangeDates(range, now: now, calendar: calendar)
-        let keys = dates.map { DayKey.string($0, calendar: calendar) }
+        let buckets = Self.buckets(range, h: h, now: now, calendar: calendar)
+        let dates = buckets.map(\.date)
+        let keys = dates
         let earlierId = "earlier"
 
         // model -> project (or earlierId) -> tokens per day
@@ -77,12 +79,12 @@ extension Aggregator {
         func add(_ model: String, _ project: String, _ i: Int, _ t: TokenCounts) {
             acc[model, default: [:]][project, default: Array(repeating: .zero, count: keys.count)][i] += t
         }
-        for (i, k) in keys.enumerated() {
+        for (i, bucket) in buckets.enumerated() {
             var attributed: [String: TokenCounts] = [:]
-            for (project, models) in h.projectDays[k] ?? [:] {
+            for (project, models) in bucket.projects {
                 for (model, tok) in models { add(model, project, i, tok); attributed[model, default: .zero] += tok }
             }
-            for (model, tok) in h.days[k] ?? [:] {
+            for (model, tok) in bucket.totals ?? [:] {
                 let p = attributed[model] ?? .zero
                 let rem = TokenCounts(input: max(0, tok.input - p.input), output: max(0, tok.output - p.output),
                                       cacheWrite: max(0, tok.cacheWrite - p.cacheWrite), cacheRead: max(0, tok.cacheRead - p.cacheRead))

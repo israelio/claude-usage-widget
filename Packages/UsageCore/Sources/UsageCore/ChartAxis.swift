@@ -28,9 +28,10 @@ public enum ChartAxis {
     }
 }
 
-/// The heading line of the Usage window ("Saturday, 7 November 2026 · 6 projects").
+/// The heading line of the Usage window ("Saturday, 7 November 2026 · 6 projects"; for sessions "Sun 9 Nov · 14:00–19:00 · 4 projects",
+/// or "Last 7 days · 18 sessions · 63 projects" with `sessionsTitle`).
 public enum ProjectRangeLabel {
-    public static func make(range: ProjectRange, count: Int, noun: String = "project", now: Date,
+    public static func make(range: ProjectRange, count: Int, noun: String = "project", sessionsTitle: String? = nil, now: Date,
                             calendar: Calendar = .current, locale: Locale = .current) -> String {
         func fmt(_ d: Date, _ pattern: String) -> String {
             let f = DateFormatter()
@@ -41,6 +42,12 @@ public enum ProjectRangeLabel {
         let label = "\(count) \(noun)" + (count == 1 ? "" : "s")
         let head: String
         switch range {
+        case .session(let s):
+            let day = fmt(s.start, "EEEdMMM"), from = fmt(s.start, "Hmm"), to = fmt(s.end, "Hmm")
+            head = "\(day) · \(from)–\(to)"
+            return "\(head) · \(label)" + (s.isActive(now: now) ? " · active" : "")
+        case .sessions(let list):
+            return "\(sessionsTitle ?? "Sessions") · \(list.count) session" + (list.count == 1 ? "" : "s") + " · \(label)"
         case .day(let d):
             head = fmt(d, "EEEEdMMMMyyyy")
         case .lastDays(let n), .window(_, let n):

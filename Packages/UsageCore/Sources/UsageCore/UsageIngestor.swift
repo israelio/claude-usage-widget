@@ -27,7 +27,7 @@ public actor UsageIngestor {
     /// Scans new log lines, rolls them up, prunes, persists only if something changed, returns a copy.
     public func refreshLogs(now: Date = Date()) -> HistoryData {
         let scanner = ensureLoaded()
-        var changed = backfillProjectsIfNeeded(now: now)
+        var changed = backfillIfNeeded(now: now)
         var new = scanner.scan(now: now)
         for i in new.indices { new[i].project = resolver.resolve(cwd: new[i].cwd).root }
         lastNewCount = new.count
@@ -40,17 +40,26 @@ public actor UsageIngestor {
         return history
     }
 
-    /// One-off: rebuilds `projectDays` from all log files still on disk, with a throwaway scanner (own `seen` set).
-    /// Only records already counted in `days` (present in the real scanner's `seen`) are used, so anything newer is
-    /// left for the regular incremental scan and nothing is counted twice. Touches nothing but `projectDays`.
-    private func backfillProjectsIfNeeded(now: Date) -> Bool {
-        guard history.projectSchemaVersion < 1 else { return false }
+    /// One-off: rebuilds `projectDays` and/or `hourly` (whichever schema version is behind) from all log files still
+    /// on disk, in a single pass with a throwaway scanner (own `seen` set). Only records already counted in `days`
+    /// (present in the real scanner's `seen`) are used, so anything newer is left for the regular incremental scan and
+    /// nothing is counted twice. Touches nothing but the structures being backfilled.
+    private func backfillIfNeeded(now: Date) -> Bool {
+        let projects = history.projectSchemaVersion < 1, hourly = history.hourlySchemaVersion < 1
+        guard projects || hourly else { return false }
         var records = LogScanner(root: logsRoot, state: ScanState()).scan(now: now)
             .filter { history.scan.seen[$0.id] != nil }
         for i in records.indices { records[i].project = resolver.resolve(cwd: records[i].cwd).root }
-        history.projectDays = [:]
-        history.addProjects(records)
-        history.projectSchemaVersion = 1
+        if projects {
+            history.projectDays = [:]
+            history.addProjects(records)
+            history.projectSchemaVersion = 1
+        }
+        if hourly {
+            history.hourly = [:]
+            history.addHourly(records)
+            history.hourlySchemaVersion = 1
+        }
         return true
     }
 

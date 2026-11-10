@@ -5,6 +5,11 @@ public enum ProjectRange: Equatable, Sendable {
     case lastDays(Int)
     /// `days` days ending on (and including) `end`, which need not be today.
     case window(end: Date, days: Int)
+    /// One 5-hour session; the trend has one point per hour of the session (5 points, empty hours included).
+    case session(UsageSession)
+    /// A set of sessions (oldest first); the trend has one point per session, dated at its start. There is no
+    /// "Earlier (unknown)" remainder for sessions: hourly data always carries its project.
+    case sessions([UsageSession])
 }
 
 /// One model's usage inside a project (or the synthetic Other / Earlier rows).
@@ -57,7 +62,7 @@ public struct ProjectRow: Equatable, Sendable, Identifiable {
     public var models: [ModelShare]
     /// Tokens, cost and share per model, ordered by cost (by tokens after `ProjectBreakdown.sorted(byTokens: true)`).
     public var modelUsage: [ModelUsage] = []
-    /// One point per day of the range, oldest first, empty days included.
+    /// One point per day of the range (per hour / per session for session ranges), oldest first, empty ones included.
     public var daily: [DailyPoint]
     public var isEarlier = false
 }
@@ -115,32 +120,31 @@ extension Aggregator {
     /// Per-project cost and tokens over `range`. Project keys are root paths; names are disambiguated here.
     public static func byProject(_ h: HistoryData, prices: PriceTable, range: ProjectRange, now: Date,
                                  calendar: Calendar = .current, home: String = NSHomeDirectory()) -> ProjectBreakdown {
-        let dates = rangeDates(range, now: now, calendar: calendar)
-        let keys = dates.map { DayKey.string($0, calendar: calendar) }
+        let buckets = Self.buckets(range, h: h, now: now, calendar: calendar)
+        let dates = buckets.map(\.date)
 
         struct Acc {
             var models: [String: TokenCounts] = [:]
-            var daily: [TokenCounts]
         }
         var acc: [String: Acc] = [:]
-        var remainder = Acc(daily: Array(repeating: .zero, count: keys.count))   // days minus projects
-        var remainderCostByDay = [Double](repeating: 0, count: keys.count)
-        for (i, k) in keys.enumerated() {
+        var remainder = Acc()   // days minus projects
+        var remainderDaily = [TokenCounts](repeating: .zero, count: buckets.count)
+        var remainderCostByDay = [Double](repeating: 0, count: buckets.count)
+        for (i, bucket) in buckets.enumerated() {
             var projectSum: [String: TokenCounts] = [:]
-            for (project, models) in h.projectDays[k] ?? [:] {
+            for (project, models) in bucket.projects {
                 for (model, tok) in models {
-                    acc[project, default: Acc(daily: Array(repeating: .zero, count: keys.count))].models[model, default: .zero] += tok
-                    acc[project]!.daily[i] += tok
+                    acc[project, default: Acc()].models[model, default: .zero] += tok
                     projectSum[model, default: .zero] += tok
                 }
             }
-            for (model, tok) in h.days[k] ?? [:] {
+            for (model, tok) in bucket.totals ?? [:] {
                 let p = projectSum[model] ?? .zero
                 let rem = TokenCounts(input: max(0, tok.input - p.input), output: max(0, tok.output - p.output),
                                       cacheWrite: max(0, tok.cacheWrite - p.cacheWrite), cacheRead: max(0, tok.cacheRead - p.cacheRead))
                 guard rem.total > 0 else { continue }
                 remainder.models[model, default: .zero] += rem
-                remainder.daily[i] += rem
+                remainderDaily[i] += rem
                 remainderCostByDay[i] += prices.cost(model: model, tokens: rem)
             }
         }
@@ -158,10 +162,10 @@ extension Aggregator {
         }
         /// Daily points need per-day cost, which depends on the per-model split of that day.
         func dailyPoints(_ project: String) -> [DailyPoint] {
-            keys.enumerated().map { i, k in
+            buckets.map { bucket in
                 var t = TokenCounts.zero, c = 0.0
-                for (m, tok) in h.projectDays[k]?[project] ?? [:] { t += tok; c += prices.cost(model: m, tokens: tok) }
-                return DailyPoint(day: dates[i], tokens: t, cost: c)
+                for (m, tok) in bucket.projects[project] ?? [:] { t += tok; c += prices.cost(model: m, tokens: tok) }
+                return DailyPoint(day: bucket.date, tokens: t, cost: c)
             }
         }
 
@@ -172,9 +176,9 @@ extension Aggregator {
             return r
         }
         var earlier: ProjectRow?
-        if remainder.daily.contains(where: { $0.total > 0 }) {
+        if remainderDaily.contains(where: { $0.total > 0 }) {
             var r = row(id: "earlier", name: ProjectBreakdown.earlierName, root: nil, remainder)
-            r.daily = keys.indices.map { DailyPoint(day: dates[$0], tokens: remainder.daily[$0], cost: remainderCostByDay[$0]) }
+            r.daily = dates.indices.map { DailyPoint(day: dates[$0], tokens: remainderDaily[$0], cost: remainderCostByDay[$0]) }
             r.isEarlier = true
             earlier = r
         }
@@ -191,7 +195,37 @@ extension Aggregator {
         return ProjectBreakdown(rows: rows, earlier: earlier, total: total)
     }
 
-    /// The start-of-day dates of `range`, oldest first.
+    /// One trend point's worth of usage: its date, the per-project tokens and (days only) the day's per-model totals
+    /// used to find usage with no project info.
+    struct Bucket {
+        var date: Date
+        var projects: [String: [String: TokenCounts]]
+        var totals: [String: TokenCounts]?
+    }
+
+    /// The trend points of `range`, oldest first: a day each for day ranges, an hour each for one session, a session
+    /// each for a set of sessions.
+    static func buckets(_ range: ProjectRange, h: HistoryData, now: Date, calendar: Calendar) -> [Bucket] {
+        switch range {
+        case .session(let s):
+            return (0..<UsageSession.length).map { i in
+                Bucket(date: Date(timeIntervalSince1970: Double(s.id + i) * 3600), projects: s.hours[s.id + i] ?? [:], totals: nil)
+            }
+        case .sessions(let list):
+            return list.map { s in
+                var merged: [String: [String: TokenCounts]] = [:]
+                for p in s.hours.values { for (project, models) in p { for (m, t) in models { merged[project, default: [:]][m, default: .zero] += t } } }
+                return Bucket(date: s.start, projects: merged, totals: nil)
+            }
+        default:
+            return rangeDates(range, now: now, calendar: calendar).map { d in
+                let k = DayKey.string(d, calendar: calendar)
+                return Bucket(date: d, projects: h.projectDays[k] ?? [:], totals: h.days[k] ?? [:])
+            }
+        }
+    }
+
+    /// The start-of-day dates of a day-based `range`, oldest first (empty for session ranges).
     static func rangeDates(_ range: ProjectRange, now: Date, calendar: Calendar) -> [Date] {
         switch range {
         case .day(let d): return [calendar.startOfDay(for: d)]
@@ -199,6 +233,7 @@ extension Aggregator {
             return (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: end)!) }
         case .lastDays(let n):
             return (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: now)!) }
+        case .session, .sessions: return []
         }
     }
 
