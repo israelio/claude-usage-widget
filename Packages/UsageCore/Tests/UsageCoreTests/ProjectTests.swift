@@ -211,4 +211,91 @@ final class ProjectTests: XCTestCase {
         XCTAssertNil(b.earlier)
         XCTAssertEqual(b.sorted(byTokens: true).rows.first?.name, "proj10")
     }
+
+    // MARK: per-project model breakdown
+
+    private func modelFixture() -> (HistoryData, Calendar, Date) {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = ISODate.parse("2026-11-10T12:00:00Z")!
+        var h = HistoryData()
+        let s = "claude-sonnet-5-5", o = "claude-opus-5-5"
+        h.projectDays["2026-11-10"] = ["/p/a": [s: TokenCounts(output: 1_000_000), o: TokenCounts(output: 500_000)],
+                                       "/p/b": [s: TokenCounts(output: 200_000)]]
+        h.projectDays["2026-11-09"] = ["/p/a": [s: TokenCounts(output: 1_000_000)], "/p/b": [o: TokenCounts(output: 100_000)]]
+        h.days["2026-11-10"] = [s: TokenCounts(output: 1_200_000), o: TokenCounts(output: 500_000)]
+        h.days["2026-11-09"] = [s: TokenCounts(output: 1_000_000), o: TokenCounts(output: 100_000)]
+        return (h, cal, now)
+    }
+
+    func testModelUsagePerProject() {
+        let (h, cal, now) = modelFixture()
+        let b = Aggregator.byProject(h, prices: .defaults, range: .lastDays(7), now: now, calendar: cal, home: "/h")
+        let a = b.rows.first { $0.name == "a" }!
+        XCTAssertEqual(a.modelUsage.count, 2)
+        let s = a.modelUsage.first { $0.model == "claude-sonnet-5-5" }!
+        let o = a.modelUsage.first { $0.model == "claude-opus-5-5" }!
+        XCTAssertEqual(s.tokens.output, 2_000_000)
+        XCTAssertEqual(o.tokens.output, 500_000)
+        XCTAssertEqual(s.cost, PriceTable.defaults.cost(model: s.model, tokens: s.tokens), accuracy: 1e-9)
+        XCTAssertEqual(o.cost, PriceTable.defaults.cost(model: o.model, tokens: o.tokens), accuracy: 1e-9)
+        XCTAssertEqual(a.modelUsage.reduce(0) { $0 + $1.cost }, a.cost, accuracy: 1e-9)
+        XCTAssertEqual(a.modelUsage.reduce(0) { $0 + $1.share }, 1, accuracy: 1e-9)
+        XCTAssertEqual(a.modelUsage.map(\.cost), a.modelUsage.map(\.cost).sorted(by: >))
+        XCTAssertEqual(a.modelUsage.map(\.model), a.models.map(\.model))
+        let bb = b.rows.first { $0.name == "b" }!
+        XCTAssertEqual(Set(bb.modelUsage.map(\.model)), ["claude-sonnet-5-5", "claude-opus-5-5"])
+        XCTAssertEqual(bb.modelUsage.reduce(0) { $0 + $1.share }, 1, accuracy: 1e-9)
+    }
+
+    func testModelUsageZeroCostSharesByTokensAndEmptyRange() {
+        let (h, cal, now) = modelFixture()
+        var free = h
+        free.projectDays["2026-11-10"] = ["/p/z": ["x-unpriced": TokenCounts(output: 300), "y-unpriced": TokenCounts(output: 100)]]
+        let b = Aggregator.byProject(free, prices: PriceTable(byFamily: [:]), range: .lastDays(1), now: now, calendar: cal)
+        let z = b.rows.first { $0.name == "z" }!
+        XCTAssertEqual(z.cost, 0)
+        XCTAssertEqual(z.modelUsage.map(\.model), ["x-unpriced", "y-unpriced"])
+        XCTAssertEqual(z.modelUsage[0].share, 0.75, accuracy: 1e-9)
+
+        let e = Aggregator.byProject(HistoryData(), prices: .defaults, range: .lastDays(7), now: now, calendar: cal)
+        XCTAssertTrue(e.rows.isEmpty); XCTAssertNil(e.earlier); XCTAssertNil(e.other)
+    }
+
+    func testModelUsageEarlierAndOtherAndTokenSort() {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = ISODate.parse("2026-11-10T12:00:00Z")!
+        let s = "claude-sonnet-5-5", o = "claude-opus-5-5"
+        var h = HistoryData()
+        var day: [String: [String: TokenCounts]] = [:]
+        for i in 1...10 { day["/p/proj\(i)"] = [s: TokenCounts(output: i * 1000), o: TokenCounts(output: 10)] }
+        h.projectDays["2026-11-10"] = day
+        h.days["2026-11-10"] = [s: TokenCounts(output: 55_000 + 400), o: TokenCounts(output: 100)]
+        let b = Aggregator.byProject(h, prices: .defaults, range: .lastDays(1), now: now, calendar: cal)
+        // earlier: unattributed remainder from the model dimension
+        XCTAssertEqual(b.earlier?.modelUsage.map(\.model), [s])
+        XCTAssertEqual(b.earlier?.modelUsage.first?.tokens.output, 400)
+        // other merges models across the 2 tail projects
+        let other = b.other!
+        XCTAssertEqual(other.modelUsage.count, 2)
+        XCTAssertEqual(other.modelUsage.first { $0.model == o }?.tokens.output, 20)
+        XCTAssertEqual(other.modelUsage.first { $0.model == s }?.tokens.output, b.tail.reduce(0) { $0 + $1.tokens.output } - 20)
+        XCTAssertEqual(other.modelUsage.reduce(0) { $0 + $1.share }, 1, accuracy: 1e-9)
+        XCTAssertEqual(other.modelUsage.reduce(0) { $0 + $1.cost }, other.cost, accuracy: 1e-9)
+        // token sort keeps modelUsage ordered by tokens
+        let t = b.sorted(byTokens: true)
+        for r in t.rows { XCTAssertEqual(r.modelUsage.map(\.tokens.total), r.modelUsage.map(\.tokens.total).sorted(by: >)) }
+        XCTAssertEqual(t.other?.modelUsage.map(\.tokens.total), t.other?.modelUsage.map(\.tokens.total).sorted(by: >))
+        XCTAssertEqual(t.rows.map(\.modelUsage.count), b.sorted(byTokens: false).rows.sorted { $0.tokens.total > $1.tokens.total }.map(\.modelUsage.count))
+    }
+
+    func testCSVWithModels() {
+        let (h, cal, now) = modelFixture()
+        let b = Aggregator.byProject(h, prices: .defaults, range: .lastDays(7), now: now, calendar: cal, home: "/h")
+        let lines = ProjectCSV.makeWithModels(b).split(separator: "\n")
+        XCTAssertEqual(lines[0], "project,model,input,output,cache_write,cache_read,total_tokens,cost_usd")
+        XCTAssertEqual(lines.count, 1 + 4)
+        XCTAssertTrue(lines.contains("a,claude-sonnet-5-5,0,2000000,0,0,2000000,30.0000"))
+        XCTAssertEqual(ProjectCSV.makeWithModels(ProjectBreakdown(rows: [], earlier: nil, total: .zero)),
+                       "project,model,input,output,cache_write,cache_read,total_tokens,cost_usd\n")
+    }
 }

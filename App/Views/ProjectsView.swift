@@ -141,7 +141,10 @@ struct ProjectsView: View {
                 .pickerStyle(.segmented).labelsHidden().frame(width: 140)
             if model.day != nil { dayNavigator }
             Spacer()
-            Button("Export CSV") { export(b) }
+            Menu("Export CSV") {
+                Button("Projects") { export(b, byModel: false) }
+                Button("Projects by model") { export(b, byModel: true) }
+            }.fixedSize()
         }
     }
 
@@ -269,15 +272,40 @@ struct ProjectsView: View {
         }
     }
 
+    /// Per-model breakdown of one project; columns line up with the project rows, ordered by the active metric.
+    private func modelTable(_ r: ProjectRow) -> some View {
+        let usage = ModelUsage.ordered(r.modelUsage, byTokens: !showCost)
+        let totalTokens = r.tokens.total
+        return VStack(alignment: .leading, spacing: 3) {
+            Text("By model").fontWeight(.semibold).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Text("Model").frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 15)
+                Text("Cost").frame(width: 80, alignment: .trailing).fontWeight(showCost ? .bold : .regular)
+                Text("Tokens").frame(width: 70, alignment: .trailing).fontWeight(showCost ? .regular : .bold)
+                Text("Share").frame(width: 170, alignment: .leading)
+            }
+            .foregroundStyle(.secondary)
+            ForEach(usage) { u in
+                let f = showCost ? u.share : (totalTokens > 0 ? Double(u.tokens.total) / Double(totalTokens) : 0)
+                HStack(spacing: 12) {
+                    Text(PriceTable.displayName(u.model)).lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 15)
+                    Text(Format.cost(u.cost)).monospacedDigit().frame(width: 80, alignment: .trailing)
+                        .fontWeight(showCost ? .semibold : .regular)
+                    Text(Format.tokens(u.tokens.total)).monospacedDigit().frame(width: 70, alignment: .trailing)
+                        .fontWeight(showCost ? .regular : .semibold)
+                    shareBar(f, dimmed: false).frame(width: 170)
+                }
+                .font(.system(size: 12))
+                .help("\(PriceTable.displayName(u.model)): \(Format.cost(u.cost)) over \(Format.tokens(u.tokens.total)) tokens in this project")
+            }
+        }
+        .padding(.bottom, 2)
+    }
+
     private func detail(_ r: ProjectRow, _ b: ProjectBreakdown, _ ctx: ProjectBreakdown?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !r.models.isEmpty {
-                HStack(spacing: 14) {
-                    ForEach(r.models, id: \.model) { m in
-                        Text("\(PriceTable.displayName(m.model)) \(Int((m.fraction * 100).rounded()))%")
-                    }
-                }
-            }
+            if !r.modelUsage.isEmpty { modelTable(r) }
             HStack {
                 Text("In \(Format.tokens(r.tokens.input)) · Out \(Format.tokens(r.tokens.output)) · Cache \(Format.tokens(r.tokens.cache))")
                     .foregroundStyle(.secondary)
@@ -293,16 +321,16 @@ struct ProjectsView: View {
         .font(.system(size: 11))
     }
 
-    private func export(_ b: ProjectBreakdown) {
+    private func export(_ b: ProjectBreakdown, byModel: Bool) {
         let panel = NSSavePanel()
         let label: String
         switch model.span {
         case .day(let d): label = DayKey.string(d)
         case .days(let n): label = "\(n)d"
         }
-        panel.nameFieldStringValue = "claude-usage-projects-\(label).csv"
+        panel.nameFieldStringValue = "claude-usage-projects\(byModel ? "-by-model" : "")-\(label).csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? ProjectCSV.make(b).write(to: url, atomically: true, encoding: .utf8)
+        try? (byModel ? ProjectCSV.makeWithModels(b) : ProjectCSV.make(b)).write(to: url, atomically: true, encoding: .utf8)
     }
 }
 
