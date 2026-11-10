@@ -67,3 +67,14 @@ public enum Aggregator {
         }
     }
 }
+
+public enum DailyCSV {
+    /// One row per day: date (local), token counts and API-equivalent cost.
+    public static func make(_ points: [DailyPoint], calendar: Calendar = .current) -> String {
+        var csv = "date,input,output,cache_write,cache_read,cost_usd\n"
+        for p in points {
+            csv += "\(DayKey.string(p.day, calendar: calendar)),\(p.tokens.input),\(p.tokens.output),\(p.tokens.cacheWrite),\(p.tokens.cacheRead),\(String(format: "%.4f", p.cost))\n"
+        }
+        return csv
+    }
+}

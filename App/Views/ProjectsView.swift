@@ -95,7 +95,7 @@ struct ProjectsView: View {
         let ctx = model.day.map { service.byProject(range: .window(end: $0, days: 7)) }
         VStack(alignment: .leading, spacing: 12) {
             topBar(b)
-            Text(ProjectRangeLabel.make(range: range, projects: b.rows.count, now: Date()))
+            Text(ProjectRangeLabel.make(range: range, count: b.rows.count, now: Date()))
                 .font(.system(size: 13, weight: .semibold))
             if b.rows.isEmpty && b.earlier == nil {
                 Spacer()

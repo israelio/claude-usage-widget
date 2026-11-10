@@ -299,3 +299,107 @@ final class ProjectTests: XCTestCase {
                        "project,model,input,output,cache_write,cache_read,total_tokens,cost_usd\n")
     }
 }
+
+final class ModelBreakdownTests: XCTestCase {
+    var cal: Calendar = { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }()
+    let now = ISODate.parse("2026-11-10T12:00:00Z")!
+    let s = "claude-sonnet-5-5", o = "claude-opus-5-5"
+
+    /// Project a: 2M sonnet + 0.5M opus out; project b: 0.2M sonnet + 0.1M opus out (opus is pricier, sonnet has more tokens).
+    private func fixture(extra: Bool = false) -> HistoryData {
+        var h = HistoryData()
+        h.projectDays["2026-11-10"] = ["/p/a": [s: TokenCounts(output: 1_000_000), o: TokenCounts(output: 500_000)],
+                                       "/p/b": [s: TokenCounts(output: 200_000)]]
+        h.projectDays["2026-11-09"] = ["/p/a": [s: TokenCounts(output: 1_000_000)], "/p/b": [o: TokenCounts(output: 100_000)]]
+        h.days["2026-11-10"] = [s: TokenCounts(output: 1_200_000 + (extra ? 300_000 : 0)), o: TokenCounts(output: 500_000)]
+        h.days["2026-11-09"] = [s: TokenCounts(output: 1_000_000), o: TokenCounts(output: 100_000)]
+        return h
+    }
+    private func run(_ h: HistoryData, _ r: ProjectRange = .lastDays(7)) -> ModelBreakdown {
+        Aggregator.byModel(h, prices: .defaults, range: r, now: now, calendar: cal, home: "/h")
+    }
+
+    func testTotalsProjectsAndShares() {
+        let b = run(fixture())
+        XCTAssertEqual(Set(b.rows.map(\.model)), [s, o])
+        let sr = b.rows.first { $0.model == s }!, or = b.rows.first { $0.model == o }!
+        XCTAssertEqual(sr.tokens.output, 2_200_000)
+        XCTAssertEqual(or.tokens.output, 600_000)
+        XCTAssertEqual(sr.cost, PriceTable.defaults.cost(model: s, tokens: sr.tokens), accuracy: 1e-9)
+        XCTAssertEqual(Set(sr.projects.map(\.name)), ["a", "b"])
+        XCTAssertEqual(sr.projects.first { $0.name == "a" }?.tokens.output, 2_000_000)
+        XCTAssertEqual(sr.projects.first { $0.name == "a" }?.root, "/p/a")
+        XCTAssertEqual(or.projects.first { $0.name == "b" }?.tokens.output, 100_000)
+        for r in b.rows {
+            XCTAssertEqual(r.projects.reduce(0) { $0 + $1.share }, 1, accuracy: 1e-9)
+            XCTAssertEqual(r.projects.reduce(0) { $0 + $1.cost }, r.cost, accuracy: 1e-9)
+            XCTAssertEqual(r.daily.count, 7)
+            XCTAssertEqual(r.daily.reduce(0) { $0 + $1.cost }, r.cost, accuracy: 1e-9)
+            XCTAssertTrue(r.projects.allSatisfy { $0.daily.count == 7 })
+        }
+        XCTAssertEqual(b.rows.reduce(0) { $0 + $1.share }, 1, accuracy: 1e-9)
+        XCTAssertEqual(b.total.cost, b.rows.reduce(0) { $0 + $1.cost }, accuracy: 1e-9)
+        // same totals as the project view
+        XCTAssertEqual(b.total.cost, Aggregator.byProject(fixture(), prices: .defaults, range: .lastDays(7), now: now, calendar: cal, home: "/h").total.cost, accuracy: 1e-9)
+        XCTAssertEqual(sr.daily.last?.tokens.output, 1_200_000)
+    }
+
+    func testOrderingByCostAndByTokens() {
+        let b = run(fixture())
+        // opus: 600k * $75/M = 45 ; sonnet: 2.2M * $15/M = 33
+        XCTAssertEqual(b.rows.map(\.model), [o, s])
+        XCTAssertEqual(b.rows[1].projects.map(\.name), ["a", "b"])
+        let t = b.sorted(byTokens: true)
+        XCTAssertTrue(t.byTokens)
+        XCTAssertEqual(t.rows.map(\.model), [s, o])
+        XCTAssertEqual(t.rows[0].projects.map(\.name), ["a", "b"])
+        XCTAssertEqual(t.rows[1].projects.map(\.tokens.total), [500_000, 100_000])
+        XCTAssertEqual(b.sorted(byTokens: false), b)
+    }
+
+    func testRanges() {
+        let h = fixture()
+        let day = run(h, .day(ISODate.parse("2026-11-09T01:00:00Z")!))
+        XCTAssertEqual(day.rows.count, 2)
+        XCTAssertEqual(day.rows.first { $0.model == o }?.projects.map(\.name), ["b"])
+        XCTAssertEqual(day.rows[0].daily.count, 1)
+        let w = run(h, .window(end: ISODate.parse("2026-11-09T01:00:00Z")!, days: 3))
+        XCTAssertEqual(w.rows.first { $0.model == s }?.tokens.output, 1_000_000)
+        XCTAssertEqual(w.rows[0].daily.count, 3)
+    }
+
+    func testEmptyRange() {
+        let b = run(HistoryData())
+        XCTAssertTrue(b.rows.isEmpty)
+        XCTAssertEqual(b.total, .zero)
+        XCTAssertTrue(run(fixture(), .day(ISODate.parse("2026-10-01T00:00:00Z")!)).rows.isEmpty)
+        XCTAssertEqual(ModelCSV.makeByProject(b), "model,project,input,output,cache_write,cache_read,total_tokens,cost_usd\n")
+    }
+
+    func testEarlierRemainderUnderModel() {
+        let b = run(fixture(extra: true))
+        let sr = b.rows.first { $0.model == s }!
+        let e = sr.projects.first { $0.isEarlier }!
+        XCTAssertEqual(e.name, "Earlier (unknown)")
+        XCTAssertNil(e.root)
+        XCTAssertEqual(e.tokens.output, 300_000)
+        XCTAssertEqual(sr.tokens.output, 2_500_000)
+        XCTAssertEqual(b.rows.first { $0.model == o }?.projects.contains { $0.isEarlier }, false)
+        XCTAssertEqual(b.total.cost, Aggregator.byProject(fixture(extra: true), prices: .defaults, range: .lastDays(7), now: now, calendar: cal, home: "/h").total.cost, accuracy: 1e-9)
+    }
+
+    func testCSVByProject() {
+        let lines = ModelCSV.makeByProject(run(fixture(extra: true))).split(separator: "\n")
+        XCTAssertEqual(lines[0], "model,project,input,output,cache_write,cache_read,total_tokens,cost_usd")
+        XCTAssertEqual(lines.count, 1 + 5)   // opus: a, b; sonnet: a, b, earlier
+        XCTAssertTrue(lines.contains("claude-sonnet-5-5,a,0,2000000,0,0,2000000,30.0000"))
+        XCTAssertTrue(lines.contains("claude-sonnet-5-5,Earlier (unknown),0,300000,0,0,300000,4.5000"))
+        XCTAssertEqual(lines[1].prefix(15), "claude-opus-5-5")
+    }
+
+    func testDailyCSV() {
+        let d = cal.startOfDay(for: now)
+        let csv = DailyCSV.make([DailyPoint(day: d, tokens: TokenCounts(input: 1, output: 2, cacheWrite: 3, cacheRead: 4), cost: 1.5)], calendar: cal)
+        XCTAssertEqual(csv, "date,input,output,cache_write,cache_read,cost_usd\n2026-11-10,1,2,3,4,1.5000\n")
+    }
+}

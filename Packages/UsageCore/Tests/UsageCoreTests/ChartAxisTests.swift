@@ -25,9 +25,11 @@ final class ChartAxisTests: XCTestCase {
         let loc = Locale(identifier: "en_GB")
         let now = cal.date(from: DateComponents(year: 2026, month: 11, day: 9, hour: 12))!
         let day = cal.date(from: DateComponents(year: 2026, month: 11, day: 7))!
-        XCTAssertEqual(ProjectRangeLabel.make(range: .day(day), projects: 6, now: now, calendar: cal, locale: loc),
+        XCTAssertEqual(ProjectRangeLabel.make(range: .day(day), count: 6, now: now, calendar: cal, locale: loc),
                        "Saturday, 7 November 2026 · 6 projects")
-        XCTAssertEqual(ProjectRangeLabel.make(range: .lastDays(30), projects: 1, now: now, calendar: cal, locale: loc),
+        XCTAssertEqual(ProjectRangeLabel.make(range: .lastDays(30), count: 1, now: now, calendar: cal, locale: loc),
                        "Last 30 days (11 Oct – 9 Nov) · 1 project")
+        XCTAssertEqual(ProjectRangeLabel.make(range: .lastDays(7), count: 3, noun: "model", now: now, calendar: cal, locale: loc),
+                       "Last 7 days (3 Nov – 9 Nov) · 3 models")
     }
 }

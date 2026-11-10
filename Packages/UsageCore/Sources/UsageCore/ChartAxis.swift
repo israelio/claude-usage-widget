@@ -1,6 +1,6 @@
 import Foundation
 
-/// Pure helpers for the project trend chart's axes and the Usage by Project heading.
+/// Pure helpers for the project trend chart's axes and the Usage window's heading.
 public enum ChartAxis {
     /// Days between X axis labels for a chart of `count` daily points.
     public static func strideDays(forCount count: Int) -> Int {
@@ -28,9 +28,9 @@ public enum ChartAxis {
     }
 }
 
-/// The heading line of the Usage by Project window.
+/// The heading line of the Usage window ("Saturday, 7 November 2026 · 6 projects").
 public enum ProjectRangeLabel {
-    public static func make(range: ProjectRange, projects: Int, now: Date,
+    public static func make(range: ProjectRange, count: Int, noun: String = "project", now: Date,
                             calendar: Calendar = .current, locale: Locale = .current) -> String {
         func fmt(_ d: Date, _ pattern: String) -> String {
             let f = DateFormatter()
@@ -38,7 +38,7 @@ public enum ProjectRangeLabel {
             f.setLocalizedDateFormatFromTemplate(pattern)
             return f.string(from: d)
         }
-        let noun = "\(projects) project" + (projects == 1 ? "" : "s")
+        let label = "\(count) \(noun)" + (count == 1 ? "" : "s")
         let head: String
         switch range {
         case .day(let d):
@@ -49,6 +49,6 @@ public enum ProjectRangeLabel {
             let start = calendar.date(byAdding: .day, value: -(max(1, n) - 1), to: end)!
             head = "Last \(n) days (\(fmt(start, "dMMM")) – \(fmt(end, "dMMM")))"
         }
-        return "\(head) · \(noun)"
+        return "\(head) · \(label)"
     }
 }

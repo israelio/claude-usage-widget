@@ -115,14 +115,7 @@ extension Aggregator {
     /// Per-project cost and tokens over `range`. Project keys are root paths; names are disambiguated here.
     public static func byProject(_ h: HistoryData, prices: PriceTable, range: ProjectRange, now: Date,
                                  calendar: Calendar = .current, home: String = NSHomeDirectory()) -> ProjectBreakdown {
-        let dates: [Date]
-        switch range {
-        case .day(let d): dates = [calendar.startOfDay(for: d)]
-        case .window(let end, let n):
-            dates = (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: end)!) }
-        case .lastDays(let n):
-            dates = (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: now)!) }
-        }
+        let dates = rangeDates(range, now: now, calendar: calendar)
         let keys = dates.map { DayKey.string($0, calendar: calendar) }
 
         struct Acc {
@@ -198,6 +191,17 @@ extension Aggregator {
         return ProjectBreakdown(rows: rows, earlier: earlier, total: total)
     }
 
+    /// The start-of-day dates of `range`, oldest first.
+    static func rangeDates(_ range: ProjectRange, now: Date, calendar: Calendar) -> [Date] {
+        switch range {
+        case .day(let d): return [calendar.startOfDay(for: d)]
+        case .window(let end, let n):
+            return (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: end)!) }
+        case .lastDays(let n):
+            return (0..<max(1, n)).reversed().map { calendar.startOfDay(for: calendar.date(byAdding: .day, value: -$0, to: now)!) }
+        }
+    }
+
     private static func share(_ r: ProjectRow, _ total: Totals) -> Double {
         if total.cost > 0 { return r.cost / total.cost }
         return total.tokens.total > 0 ? Double(r.tokens.total) / Double(total.tokens.total) : 0
@@ -226,7 +230,7 @@ public enum ProjectCSV {
         return csv
     }
 
-    private static func escape(_ s: String) -> String {
+    static func escape(_ s: String) -> String {
         s.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" }) ? "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : s
     }
 }
