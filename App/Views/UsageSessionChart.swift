@@ -58,8 +58,8 @@ struct UsageSessionChart: View {
         let hit = hovered.flatMap { h in sessions.first { $0.id == h } }
         Chart {
             ForEach(sessions) { s in
-                BarMark(xStart: .value("Start", s.start), xEnd: .value("End", s.end),
-                        y: .value(showCost ? "Cost" : "Tokens", value(s)))
+                RectangleMark(xStart: .value("Start", s.start), xEnd: .value("End", s.end),
+                        yStart: .value("Base", 0.0), yEnd: .value(showCost ? "Cost" : "Tokens", value(s)))
                     .foregroundStyle(.orange.gradient)
                     .opacity(isSelected(s) || s.id == hit?.id ? 1 : 0.3)
             }

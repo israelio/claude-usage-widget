@@ -211,7 +211,8 @@ struct UsageTrendChart: View {
         switch unit {
         case .day: BarMark(x: .value("Day", p.day, unit: .day), y: y)
         case .hour: BarMark(x: .value("Hour", p.day, unit: .hour), y: y)
-        case .session: BarMark(xStart: .value("Start", p.day), xEnd: .value("End", p.day.addingTimeInterval(5 * 3600)), y: y)
+        case .session: RectangleMark(xStart: .value("Start", p.day), xEnd: .value("End", p.day.addingTimeInterval(5 * 3600)),
+                               yStart: .value("Base", 0.0), yEnd: y)
         }
     }
 }
