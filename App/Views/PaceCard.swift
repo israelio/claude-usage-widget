@@ -23,7 +23,7 @@ struct PaceCard: View {
         GlassCard(title: "Pace", icon: "chart.line.uptrend.xyaxis",
                   trailing: AnyView(Text(window?.resetsAt.map { Format.resetsIn($0) } ?? "").font(.caption).foregroundStyle(.secondary))) {
             if points.count < 2 {
-                Text("Collecting samples…").font(.caption).foregroundStyle(.secondary).frame(height: compact ? 40 : 70)
+                Text("Collecting samples…").font(.caption).foregroundStyle(.secondary).frame(height: compact ? 52 : 70)
             } else {
                 let pts = points
                 let hit = selected.flatMap { sel in pts.min { abs($0.0.timeIntervalSince(sel)) < abs($1.0.timeIntervalSince(sel)) } }
@@ -53,7 +53,7 @@ struct PaceCard: View {
                 .chartYAxis { AxisMarks(values: [-30, 0, 30]) { v in
                     AxisValueLabel { Text("\(v.as(Int.self).map { $0 > 0 ? "+\($0)" : "\($0)" } ?? "")%").font(.system(size: 9)) } } }
                 .chartXAxis(.hidden)
-                .frame(height: compact ? 40 : 70)
+                .frame(height: compact ? 52 : 70)
             }
         }
     }

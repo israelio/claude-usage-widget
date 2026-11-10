@@ -74,7 +74,7 @@ struct DailyCard: View {
                 }
             }
             .chartYAxis { AxisMarks(values: .automatic(desiredCount: compact ? 2 : 4)) { v in AxisValueLabel { Text(axisLabel(v.as(Double.self) ?? 0)).font(.system(size: 9)) } } }
-            .frame(height: compact ? 56 : 90)
+            .frame(height: compact ? 84 : 90)
             .padding(.top, 4)
         }
     }

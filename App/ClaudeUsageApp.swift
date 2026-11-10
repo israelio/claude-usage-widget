@@ -49,7 +49,7 @@ private struct MenuBarPopover: View {
     var body: some View {
         PopoverView(service: service,
                     openSettings: { NSApp.activate(ignoringOtherApps: true); openSettings() },
-                    openUsage: { UsageWindowController.shared.show(day: $0, attachTo: nil) })
+                    openUsage: { MenuBarPopoverActions.openUsage($0) })
     }
 }
 
@@ -100,9 +100,20 @@ private struct LabelHost: View {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the pinned panel appear first
                     UsageWindowController.shared.configure(service: service)
                     UsageWindowController.shared.show(day: nil, days: 90, sessions: false, attachTo: args.contains("--show-history") ? PanelController.shared.visiblePanel : nil)
+                    if args.contains("--show-history-menubar") { UsageWindowController.shared.liftAbovePopover() }
                 }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 StatusItemTooltip.apply(MenuBarLabel.tooltip(service: service, prefs: settings.prefs))
             }
+    }
+}
+
+/// Actions triggered from the menu bar popover.
+@MainActor
+enum MenuBarPopoverActions {
+    /// Opens the Usage window as a free-standing window above the popover (see `liftAbovePopover`).
+    static func openUsage(_ day: Date?) {
+        UsageWindowController.shared.show(day: day, attachTo: nil)
+        UsageWindowController.shared.liftAbovePopover()
     }
 }

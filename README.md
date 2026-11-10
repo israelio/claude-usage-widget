@@ -12,6 +12,8 @@ A native macOS menu bar app (plus desktop widgets) that shows your **Claude Code
 brew install --cask israelio/tap/claude-usage
 ```
 
+After installing, start it with `open -a "Claude Usage"` or from the Applications folder or Launchpad; it lives in the menu bar.
+
 **Or download:** open the DMG from the latest release, drag **Claude Usage** onto **Applications**, and launch it. It is signed and notarized, so it opens normally; look for the usage label in your menu bar. More details in [Install](#install).
 
 > ⭐ **Staraware.** Instead of paying, pay with a star. If you like it, [star the repo](https://github.com/israelio/claude-usage-widget). Made by Ohad Israeli.
@@ -110,7 +112,7 @@ Earlier versions: see the [release notes](https://github.com/israelio/claude-usa
 brew install --cask israelio/tap/claude-usage
 ```
 
-The command is fully qualified, which is also how Homebrew's tap trust is granted for this one cask. The app updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`. To remove it and its data: `brew uninstall --zap --cask claude-usage`. The cask lives in [israelio/homebrew-tap](https://github.com/israelio/homebrew-tap).
+Start it with `open -a "Claude Usage"` or from the Applications folder or Launchpad. The command is fully qualified, which is also how Homebrew's tap trust is granted for this one cask. The app updates itself, so `brew upgrade` leaves it alone unless you pass `--greedy`. To remove it and its data: `brew uninstall --zap --cask claude-usage`. The cask lives in [israelio/homebrew-tap](https://github.com/israelio/homebrew-tap).
 
 ### Download
 

@@ -53,4 +53,18 @@ final class UsageWindowController {
     }
 
     private func detach() { if let window { WindowPlacement.detach(window) } }
+
+    /// The menu bar popover is a high-level window and stays open until the next outside click, so a normal window
+    /// opened from it would sit underneath. Lift the Usage window above the popover for now and put it back to the normal
+    /// level as soon as it loses focus (which is also when the popover closes).
+    func liftAbovePopover() {
+        guard let window else { return }
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
+        window.orderFrontRegardless()
+        var token: NSObjectProtocol?
+        token = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak window] _ in
+            window?.level = .normal
+            if let t = token { NotificationCenter.default.removeObserver(t) }
+        }
+    }
 }
