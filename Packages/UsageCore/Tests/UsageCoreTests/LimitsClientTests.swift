@@ -133,6 +133,15 @@ final class LimitsTimeoutTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(start), 3)
         XCTAssertEqual(LimitsError.timeout.errorDescription, "Timed out waiting for Keychain/usage API")
     }
+
+    /// The token comes from the Claude Code CLI's Keychain item, not the Claude desktop app: say where to sign in.
+    func testLoginErrorsPointToTheCLI() {
+        for e in [LimitsError.noToken, .unauthorized] {
+            let d = e.errorDescription ?? ""
+            XCTAssertTrue(d.contains("run `claude` in Terminal"), d)
+            XCTAssertTrue(d.contains("Claude desktop app"), d)
+        }
+    }
 }
 
 final class KeychainGateTests: XCTestCase {
