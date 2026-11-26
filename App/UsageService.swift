@@ -195,9 +195,9 @@ final class UsageService: ObservableObject {
         var fetched = false
         if isBlocked {
             self.error = blockedMessage()   // rate limited: no network call, keep the last real data
-            if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
+            snap = keptOrEstimate(estimate, now: now)
         } else if !shouldFetchNow(now: now, manual: manual) {
-            if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }   // just rescan logs
+            snap = keptOrEstimate(estimate, now: now)   // just rescan logs
         } else {
             do {
                 snap = try await client.fetch()
@@ -216,7 +216,7 @@ final class UsageService: ObservableObject {
                 lastAttempt = Date()
                 noteRateLimited(retryAfter: retryAfter)
                 self.error = blockedMessage()
-                if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
+                snap = keptOrEstimate(estimate, now: now)
             } catch {
                 self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 result = .failed
@@ -225,7 +225,7 @@ final class UsageService: ObservableObject {
                 if let e = error as? LimitsError, local.contains(e) { if e == .keychainLocked { scheduleLockedRetry() } }
                 else { lastAttempt = Date() }
                 // Keep the last real snapshot (now stale); only fall back to the estimate if there is none.
-                if let l = limits, !l.isEstimated { snap = l } else { snap = estimate }
+                snap = keptOrEstimate(estimate, now: now)
             }
         }
         if fetched, !isBlocked { await refreshPlanIfNeeded() }
@@ -248,6 +248,13 @@ final class UsageService: ObservableObject {
         if fetched, !snap.isEstimated { await WidgetWatchdogRunner.check(groupID: groupID) }
         nextRefresh = nextFetchEstimate(now: Date())
         return result
+    }
+
+    /// The last real snapshot when there is one (windows that have since reset swapped for the estimate's),
+    /// otherwise the local estimate.
+    private func keptOrEstimate(_ estimate: LimitsSnapshot, now: Date) -> LimitsSnapshot {
+        guard let l = limits, !l.isEstimated else { return estimate }
+        return l.replacingExpired(with: estimate, now: now)
     }
 
     private func shouldFetchNow(now: Date, manual: Bool) -> Bool {

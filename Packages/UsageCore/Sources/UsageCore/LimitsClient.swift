@@ -6,8 +6,8 @@ public enum LimitsError: Error, Equatable, LocalizedError {
     case rateLimited(retryAfter: TimeInterval?)
     public var errorDescription: String? {
         switch self {
-        case .noToken: return "No Claude Code login found in Keychain"
-        case .unauthorized: return "Login expired — run Claude Code to sign in again"
+        case .noToken: return "No Claude Code CLI login found — run `claude` in Terminal and sign in (the Claude desktop app's login isn't used)"
+        case .unauthorized: return "Claude Code CLI login expired — run `claude` in Terminal to renew it (the Claude desktop app's login isn't used)"
         case .http(let c): return "Usage API error (HTTP \(c))"
         case .badResponse: return "Unexpected usage API response"
         case .timeout: return "Timed out waiting for Keychain/usage API"

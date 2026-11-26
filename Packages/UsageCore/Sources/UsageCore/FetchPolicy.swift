@@ -42,11 +42,36 @@ public struct LastFetch: Codable, Equatable, Sendable {
     public static let maxAge: TimeInterval = 6 * 3600
 
     public func save(to url: URL) { Persisted.save(self, to: url) }
-    /// Nil when missing, undecodable, estimated, or older than `maxAge`.
+    /// Nil when missing, undecodable, estimated, or older than `maxAge` with no window still in force. A snapshot
+    /// whose weekly window hasn't reset yet is kept past `maxAge` (e.g. a relaunch after a reboot while the API is
+    /// unreachable), so the app shows the last real weekly figure instead of the local token estimate.
     public static func load(from url: URL, now: Date = Date()) -> LastFetch? {
-        guard let v: LastFetch = Persisted.load(from: url), !v.limits.isEstimated,
-              now.timeIntervalSince(v.lastFetchSuccess) < maxAge else { return nil }
+        guard let v: LastFetch = Persisted.load(from: url), !v.limits.isEstimated else { return nil }
+        guard now.timeIntervalSince(v.lastFetchSuccess) < maxAge || v.limits.hasWindowInForce(now: now) else { return nil }
         return v
+    }
+}
+
+public extension LimitsSnapshot {
+    private static func expired(_ w: LimitWindow?, now: Date) -> Bool { w?.resetsAt.map { $0 <= now } ?? false }
+
+    /// True when some window has a known reset time that is still ahead.
+    func hasWindowInForce(now: Date) -> Bool {
+        ([fiveHour, sevenDay] + extra.values.map { Optional($0) }).contains { w in
+            w?.resetsAt.map { $0 > now } ?? false
+        }
+    }
+
+    /// A real snapshot kept after a failed refresh: windows whose reset time has passed show pre-reset usage, so
+    /// they are replaced by the estimate's (5-hour, weekly) or dropped (per-model); windows still in force are kept.
+    /// An estimated snapshot is returned unchanged.
+    func replacingExpired(with estimate: LimitsSnapshot, now: Date) -> LimitsSnapshot {
+        guard !isEstimated else { return self }
+        var s = self
+        if Self.expired(fiveHour, now: now) { s.fiveHour = estimate.fiveHour }
+        if Self.expired(sevenDay, now: now) { s.sevenDay = estimate.sevenDay }
+        s.extra = extra.filter { !Self.expired($0.value, now: now) }
+        return s
     }
 }
 
